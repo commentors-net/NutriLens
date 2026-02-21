@@ -1,0 +1,47 @@
+{
+  "overall_confidence": 0.62,
+  "needs_more_photos": true,
+  "suggested_next_shots": [
+    "lower_left_angle",
+    "top_down"
+  ],
+  "items": [
+    {
+      "item_id": "tmp-1",
+      "label": "white rice",
+      "label_confidence": 0.72,
+      "grams_estimate": 180,
+      "grams_range": {
+        "min": 130,
+        "max": 240
+      },
+      "grams_confidence": 0.55,
+      "macros": {
+        "kcal": 234,
+        "protein_g": 4.3,
+        "carbs_g": 51.5,
+        "fat_g": 0.6
+      }
+    },
+    {
+      "item_id": "tmp-2",
+      "label": "chicken breast",
+      "label_confidence": 0.88,
+      "grams_estimate": 150,
+      "grams_range": {
+        "min": 100,
+        "max": 200
+      },
+      "grams_confidence": 0.70,
+      "macros": {
+        "kcal": 248,
+        "protein_g": 53.9,
+        "carbs_g": 0.0,
+        "fat_g": 1.4
+      }
+    }
+  ],
+  "warnings": [
+    "oil_sauce_uncertain"
+  ]
+}

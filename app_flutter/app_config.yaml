@@ -1,0 +1,59 @@
+# FoodVision App Configuration
+# Single source of truth for app metadata across Android and iOS
+# 
+# This file defines all shared properties. After making changes:
+# 1. Update pubspec.yaml version field
+# 2. Run: flutter pub get
+# 3. Both platforms will automatically sync
+
+# App Identity (MUST match across platforms)
+app_name: FoodVision
+app_name_short: FoodVision
+bundle_id_base: com.foodvision.app
+package_name: com.foodvision.app
+
+# Version Info (Semantic Versioning: MAJOR.MINOR.PATCH+BUILD)
+# Update these in pubspec.yaml version field as: 0.1.0+1
+# version_name: 0.1.0    (from pubspec.yaml)
+# version_code: 1        (from pubspec.yaml, after +)
+
+# Platform Minimums
+android:
+  min_sdk: 21              # Android 5.0 (Lollipop)
+  target_sdk: 34           # Android 14
+  compile_sdk: 34
+  
+ios:
+  min_version: "12.0"      # iOS 12.0 (iPhone 5s, iPad Air, iPad mini 2+)
+  target_version: "16.0"   # iOS 16 (recommended)
+
+# Build Configuration
+java_version: "11"
+kotlin_version: "1.7.10"
+gradle_version: "7.3.0"
+gradle_dist_version: "7.5"
+
+# App Metadata
+description: "Multi-photo food logging + AI analysis for weight loss and athletes."
+author: "FoodVision Team"
+homepage: "https://foodvision.app"
+
+# Permissions (documented for reference)
+permissions:
+  android:
+    - CAMERA
+    - READ_EXTERNAL_STORAGE
+    - WRITE_EXTERNAL_STORAGE
+    - INTERNET
+  ios:
+    - NSCameraUsageDescription
+    - NSPhotoLibraryUsageDescription
+    - NSPhotoLibraryAddUsageDescription
+
+# Notes:
+# - Android applicationId and iOS CFBundleIdentifier MUST match
+# - Version bumps should be done in pubspec.yaml (e.g., version: 0.2.0+2)
+# - Both platforms will auto-sync from pubspec.yaml via Flutter build tools
+# - For manual verification, check:
+#   * android/app/build.gradle (applicationId, versionCode, versionName)
+#   * ios/Runner/Info.plist (CFBundleIdentifier, CFBundleShortVersionString, CFBundleVersion)

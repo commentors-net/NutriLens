@@ -1,0 +1,123 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Analyze Meal Response",
+  "description": "Response from POST /meals/analyze endpoint",
+  "type": "object",
+  "required": [
+    "overall_confidence",
+    "needs_more_photos",
+    "suggested_next_shots",
+    "items"
+  ],
+  "properties": {
+    "overall_confidence": {
+      "type": "number",
+      "description": "Overall confidence of the analysis (0–1)",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "needs_more_photos": {
+      "type": "boolean",
+      "description": "Whether more photos are recommended"
+    },
+    "suggested_next_shots": {
+      "type": "array",
+      "description": "Suggested camera angles if needs_more_photos=true",
+      "items": {
+        "type": "string",
+        "enum": [
+          "top_down",
+          "lower_left_angle",
+          "lower_right_angle",
+          "closeup"
+        ]
+      }
+    },
+    "items": {
+      "type": "array",
+      "description": "Detected food items",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "item_id",
+          "label",
+          "label_confidence",
+          "grams_estimate",
+          "grams_range",
+          "grams_confidence",
+          "macros"
+        ],
+        "properties": {
+          "item_id": {
+            "type": "string",
+            "description": "Temporary item ID (e.g., tmp-1, tmp-2)"
+          },
+          "label": {
+            "type": "string",
+            "description": "Food item label"
+          },
+          "label_confidence": {
+            "type": "number",
+            "description": "Confidence in the label (0–1)",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "grams_estimate": {
+            "type": "integer",
+            "description": "Best estimate of grams"
+          },
+          "grams_range": {
+            "type": "object",
+            "required": ["min", "max"],
+            "properties": {
+              "min": {
+                "type": "integer",
+                "description": "Minimum grams estimate"
+              },
+              "max": {
+                "type": "integer",
+                "description": "Maximum grams estimate"
+              }
+            }
+          },
+          "grams_confidence": {
+            "type": "number",
+            "description": "Confidence in gram estimate (0–1)",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "macros": {
+            "type": "object",
+            "required": ["kcal", "protein_g", "carbs_g", "fat_g"],
+            "properties": {
+              "kcal": {
+                "type": "integer",
+                "description": "Kilocalories"
+              },
+              "protein_g": {
+                "type": "number",
+                "description": "Protein in grams (1 decimal place)"
+              },
+              "carbs_g": {
+                "type": "number",
+                "description": "Carbohydrates in grams (1 decimal place)"
+              },
+              "fat_g": {
+                "type": "number",
+                "description": "Fat in grams (1 decimal place)"
+              }
+            }
+          }
+        }
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "description": "Analysis warnings (e.g., oil/sauce uncertainty)",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}
