@@ -113,7 +113,7 @@ class ReviewScreen extends ConsumerWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
-      color: color.withOpacity(0.1),
+      color: color.withValues(alpha: 0.1),
       child: Row(
         children: [
           Icon(icon, color: color),
@@ -121,8 +121,8 @@ class ReviewScreen extends ConsumerWidget {
           Expanded(
             child: Text(
               message,
-              style: TextStyle(
-                color: color.shade900,
+              style: const TextStyle(
+                color: Colors.black87,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -158,7 +158,7 @@ class ReviewScreen extends ConsumerWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.6),
+              color: Colors.black.withValues(alpha: 0.6),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
@@ -183,7 +183,7 @@ class ReviewScreen extends ConsumerWidget {
             child: Container(
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
-                color: Colors.red.withOpacity(0.9),
+                color: Colors.red.withValues(alpha: 0.9),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
@@ -205,7 +205,7 @@ class ReviewScreen extends ConsumerWidget {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 4,
             offset: const Offset(0, -2),
           ),

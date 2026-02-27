@@ -219,7 +219,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Colors.black.withOpacity(0.7),
+              Colors.black.withValues(alpha: 0.7),
               Colors.transparent,
             ],
           ),
@@ -231,8 +231,8 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
                 color: captureState.hasMinPhotos
-                    ? Colors.green.withOpacity(0.9)
-                    : Colors.orange.withOpacity(0.9),
+                    ? Colors.green.withValues(alpha: 0.9)
+                    : Colors.orange.withValues(alpha: 0.9),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
@@ -250,7 +250,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.6),
+                color: Colors.black.withValues(alpha: 0.6),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
@@ -276,7 +276,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
           begin: Alignment.bottomCenter,
           end: Alignment.topCenter,
           colors: [
-            Colors.black.withOpacity(0.7),
+            Colors.black.withValues(alpha: 0.7),
             Colors.transparent,
           ],
         ),
@@ -360,7 +360,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
             height: 56,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: Colors.white.withOpacity(0.3),
+              color: Colors.white.withValues(alpha: 0.3),
             ),
             child: Icon(
               icon,

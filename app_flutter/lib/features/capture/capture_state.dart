@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 
 /// State model for the capture flow
 /// Tracks captured photo paths and capture progress

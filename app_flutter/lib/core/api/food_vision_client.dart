@@ -26,7 +26,7 @@ class FoodVisionClient {
     // Add images
     for (final imagePath in imagePaths) {
       final file = http.MultipartFile.fromPath('images', imagePath);
-      request.files.add(file);
+      request.files.add(await file);
     }
 
     // Add metadata if provided
