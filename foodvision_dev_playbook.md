@@ -480,7 +480,305 @@ uvicorn app.main:app --reload
 
 ---
 
-## 17) Version Management & Platform Sync
+## 17) Project Progress Checklist
+
+### 📋 Phase 0: Foundation (Setup)
+- [x] Initialize monorepo structure
+- [x] Create Flutter app skeleton
+- [x] Create FastAPI backend skeleton
+- [x] Set up shared schemas directory
+- [x] Configure Android platform (Gradle, Manifest)
+- [x] Configure iOS platform (Info.plist, Podfile)
+- [x] Set up .gitignore + environment templates
+- [x] Create version sync system (app_config.yaml, verify_sync.py)
+- [x] Write comprehensive documentation (playbook, README, CONFIG_SYNC, DEPLOYMENT)
+- [x] Set up backend tests skeleton (pytest)
+- [x] Verify configuration sync works
+
+**Status:** ✅ **COMPLETE** — Ready for Milestone 1
+
+---
+
+### 📋 Milestone 1: Multi-photo Capture Flow (Flutter)
+**Goal:** Implement camera capture UI with 3-6 photos per meal
+
+#### 1.1 Camera Integration
+- [ ] Add camera permission handling (Android + iOS)
+- [ ] Implement camera preview screen
+- [ ] Test camera on real Android device
+- [ ] Handle camera errors gracefully
+
+#### 1.2 Capture Screen
+- [ ] Create CaptureScreen widget
+- [ ] Add photo counter (X of 3-6 photos)
+- [ ] Add guidance overlay ("Take top-down photo")
+- [ ] Implement capture button with feedback
+- [ ] Store captured photo paths locally
+
+#### 1.3 Review Screen
+- [ ] Create ReviewScreen with grid layout
+- [ ] Display captured photos as thumbnails
+- [ ] Add "Retake" button (removes last photo)
+- [ ] Add "Remove specific photo" functionality
+- [ ] Add "Add more photos" button
+- [ ] Add "Analyze" button (navigates to results)
+
+#### 1.4 State Management
+- [ ] Set up Riverpod providers
+- [ ] Create CaptureState model (photo paths, count)
+- [ ] Implement capture controller logic
+- [ ] Add local persistence (draft meal)
+
+#### 1.5 Navigation
+- [ ] Implement app routing (go_router or similar)
+- [ ] Link Home → Capture → Review → Results
+- [ ] Add back navigation handling
+- [ ] Test navigation flow
+
+#### 1.6 Testing & Polish
+- [ ] Widget tests for CaptureScreen
+- [ ] Widget tests for ReviewScreen
+- [ ] Test on Android emulator
+- [ ] Test on real Android device
+- [ ] Record demo video (30-60s)
+
+**Status:** 🟡 **READY TO START**
+
+---
+
+### 📋 Milestone 2: Backend Skeleton (FastAPI)
+**Goal:** Implement deterministic mock analysis endpoint
+
+#### 2.1 Endpoint Implementation
+- [x] Create `POST /meals/analyze` endpoint
+- [x] Handle multipart image upload
+- [x] Parse optional metadata JSON
+- [x] Validate inputs (min 3 images)
+
+#### 2.2 Deterministic Analysis Service
+- [x] Implement hash-based food selection
+- [x] Create canned food database (5 items)
+- [x] Generate consistent responses
+- [x] Implement confidence logic (< 5 photos = needs_more)
+- [x] Add suggested angles logic
+
+#### 2.3 Response Generation
+- [x] Build AnalyzeMealResponse model
+- [x] Include all required fields
+- [x] Compute macros from gram estimates
+- [x] Add warnings for uncertain items
+
+#### 2.4 Testing
+- [x] Unit tests for analysis service
+- [x] Unit tests for nutrition calculations
+- [ ] Integration tests for /meals/analyze endpoint
+- [ ] Test with real image uploads (curl/Postman)
+- [ ] Verify schema compliance
+
+#### 2.5 Flutter Integration
+- [ ] Connect Flutter app to backend
+- [ ] Test image upload from mobile
+- [ ] Handle network errors
+- [ ] Display loading states
+- [ ] Show results in ResultsScreen
+
+**Status:** 🟡 **80% COMPLETE** — Need integration tests + Flutter connection
+
+---
+
+### 📋 Milestone 3: Nutrition Mapping (Real Data)
+**Goal:** Replace mock data with real nutrition database
+
+#### 3.1 Database Setup
+- [ ] Set up SQLite database
+- [ ] Create Food table schema
+- [ ] Create Meal table schema
+- [ ] Create MealItem table schema
+- [ ] Set up Alembic migrations
+
+#### 3.2 Nutrition Data
+- [ ] Import nutrition data (per 100g)
+- [ ] Add common foods (50-100 items)
+- [ ] Add Malaysian/Asian foods
+- [ ] Verify data accuracy
+- [ ] Create data seeding script
+
+#### 3.3 Backend Services
+- [ ] Implement database session management
+- [ ] Create Food CRUD operations
+- [ ] Create Meal CRUD operations
+- [ ] Update nutrition service to use DB
+- [ ] Implement fuzzy food name matching
+
+#### 3.4 API Endpoints
+- [ ] Implement `POST /meals` (save meal)
+- [ ] Implement `GET /meals/today`
+- [ ] Implement `GET /meals/history`
+- [ ] Add food search endpoint
+- [ ] Test all endpoints
+
+#### 3.5 Flutter Results Screen
+- [ ] Create ResultsScreen UI
+- [ ] Display per-item macros
+- [ ] Show total meal macros
+- [ ] Add confidence indicators
+- [ ] Implement "Add more photos" flow
+
+#### 3.6 Testing
+- [ ] Test nutrition calculations
+- [ ] Test meal persistence
+- [ ] Test today's totals query
+- [ ] End-to-end test (capture → analyze → save)
+
+**Status:** ⚪ **NOT STARTED**
+
+---
+
+### 📋 Milestone 4: AI Integration (Cloud Inference)
+**Goal:** Replace deterministic mocks with real AI food detection
+
+#### 4.1 AI Service Selection
+- [ ] Research options (Google Vision, Azure, AWS, Custom)
+- [ ] Set up API credentials
+- [ ] Implement service integration
+- [ ] Test accuracy on sample images
+
+#### 4.2 Food Detection
+- [ ] Implement image preprocessing
+- [ ] Call AI API for food labeling
+- [ ] Post-process AI results
+- [ ] Map AI labels to nutrition DB
+- [ ] Handle unknown foods
+
+#### 4.3 Portion Estimation
+- [ ] Research portion estimation methods
+- [ ] Implement baseline heuristics
+- [ ] Add reference object detection (optional)
+- [ ] Generate gram ranges
+- [ ] Compute confidence scores
+
+#### 4.4 Multi-Photo Analysis
+- [ ] Combine detections from multiple angles
+- [ ] Improve confidence with more photos
+- [ ] Detect overlapping items
+- [ ] Handle partial occlusions
+
+#### 4.5 Correction Loop
+- [ ] Create EditItemScreen (label + grams)
+- [ ] Store user corrections locally
+- [ ] Send corrections to backend
+- [ ] Log corrections for model improvement
+
+#### 4.6 Testing & Tuning
+- [ ] Test with real meal photos
+- [ ] Measure accuracy metrics
+- [ ] Tune confidence thresholds
+- [ ] A/B test portion estimates
+
+**Status:** ⚪ **NOT STARTED**
+
+---
+
+### 📋 Milestone 5: Home Screen & Meal History
+**Goal:** Build home dashboard with daily summary
+
+#### 5.1 Home Screen
+- [ ] Design home screen layout
+- [ ] Show today's totals (kcal, macros)
+- [ ] Display meal history (today)
+- [ ] Add "New Meal" button
+- [ ] Show progress toward goals (optional)
+
+#### 5.2 Meal History
+- [ ] Create MealListScreen
+- [ ] Display past meals with thumbnails
+- [ ] Show date/time + macros
+- [ ] Implement tap to view details
+- [ ] Add search/filter functionality
+
+#### 5.3 Meal Details
+- [ ] Create MealDetailScreen
+- [ ] Show all items + macros
+- [ ] Display photos
+- [ ] Add edit/delete actions
+- [ ] Show confidence scores
+
+#### 5.4 Local Storage
+- [ ] Set up local database (sqflite)
+- [ ] Cache meals locally
+- [ ] Sync with backend
+- [ ] Handle offline mode
+
+**Status:** ⚪ **NOT STARTED**
+
+---
+
+### 📋 Milestone 6: Polish & Release (MVP)
+**Goal:** Prepare for beta release
+
+#### 6.1 UI/UX Polish
+- [ ] Refine theme + colors
+- [ ] Add animations/transitions
+- [ ] Improve loading states
+- [ ] Add empty states
+- [ ] Implement error screens
+- [ ] Add onboarding flow
+
+#### 6.2 Performance
+- [ ] Optimize image compression
+- [ ] Add image caching
+- [ ] Reduce API payload size
+- [ ] Test on low-end devices
+- [ ] Profile Flutter performance
+
+#### 6.3 Error Handling
+- [ ] Handle network timeouts
+- [ ] Handle camera errors
+- [ ] Handle permission denials
+- [ ] Add retry mechanisms
+- [ ] Log errors for debugging
+
+#### 6.4 Testing
+- [ ] Complete test coverage (>70%)
+- [ ] Manual testing checklist
+- [ ] Test on multiple devices
+- [ ] Beta testing with users
+- [ ] Fix critical bugs
+
+#### 6.5 Release Preparation
+- [ ] Update version to 1.0.0
+- [ ] Generate release builds (Android + iOS)
+- [ ] Prepare store listings
+- [ ] Create screenshots + videos
+- [ ] Write release notes
+
+#### 6.6 Deployment
+- [ ] Submit to Google Play (internal testing)
+- [ ] Submit to TestFlight (iOS beta)
+- [ ] Gather feedback
+- [ ] Iterate based on feedback
+- [ ] Public release
+
+**Status:** ⚪ **NOT STARTED**
+
+---
+
+### 📋 Future Enhancements (Post-MVP)
+- [ ] User accounts + authentication
+- [ ] Cloud sync across devices
+- [ ] Meal planning feature
+- [ ] Recipe suggestions
+- [ ] Barcode scanning
+- [ ] Restaurant database integration
+- [ ] Social sharing
+- [ ] Nutrition goals + tracking
+- [ ] Apple Watch / Wear OS app
+- [ ] AR measurement tools
+- [ ] Integration with fitness apps
+
+---
+
+## 18) Version Management & Platform Sync
 
 ### Single Source of Truth: pubspec.yaml
 All version information is managed centrally:
