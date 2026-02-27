@@ -82,8 +82,9 @@ dmypy.json
 **/android/**/GeneratedPluginRegistrant.java
 **/android/.externalNativeBuild/
 **/android/.cxx/
-**/android/gradlew
-**/android/gradlew.bat
+**/android/.kotlin/
+**/android/build/
+**/android/app/build/
 **/android/gradle/wrapper/gradle-wrapper.jar
 **/android/app/debug/
 **/android/app/profile/

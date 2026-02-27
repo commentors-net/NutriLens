@@ -1,0 +1,2 @@
+D:/Jobs/workspace/NutriLens/app_flutter/android/app/.cxx/debug/3194n1j3/x86_64/CMakeFiles/edit_cache.dir
+D:/Jobs/workspace/NutriLens/app_flutter/android/app/.cxx/debug/3194n1j3/x86_64/CMakeFiles/rebuild_cache.dir

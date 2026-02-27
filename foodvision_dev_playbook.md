@@ -425,6 +425,19 @@ uvicorn app.main:app --reload
 
 ### Platform Configuration (Android + iOS)
 #### Android (`app_flutter/android/`)
+Build note (2026-02-27):
+- Android tooling aligned to modern Flutter/Gradle setup:
+  - `settings.gradle` plugins: AGP `8.9.1`, Kotlin `2.1.0`, Flutter plugin loader enabled
+  - `gradle-wrapper.properties`: Gradle `8.11.1`
+  - `app/build.gradle`: migrated to `dev.flutter.flutter-gradle-plugin` DSL
+  - `build.gradle`: uses Flutter-compatible build output mapping (`../build`)
+- Required Android resources were restored:
+  - `app/src/main/res/values/strings.xml` (`app_name`)
+  - `app/src/main/res/values/styles.xml` (`LaunchTheme`, `NormalTheme`)
+- `MainActivity.kt` now uses standard `FlutterActivity` entry point without manual plugin registration.
+- `android/gradle.properties` includes Kotlin stability flags for Windows path-root cache issues:
+  - `kotlin.incremental=false`
+  - `kotlin.compiler.execution.strategy=in-process`
 - **build.gradle** — root Gradle config (minSdk: 21, targetSdk: 34)
 - **app/build.gradle** — app-level Gradle with Flutter plugin
 - **app/src/main/AndroidManifest.xml** — app bundle + permissions:
@@ -456,6 +469,9 @@ uvicorn app.main:app --reload
 - iOS: minimum 12.0 (iPad Air, iPhone 6+)
 - All required permissions declared
 - Deployment guide included
+- Android validation on 2026-02-27:
+  - `flutter build apk --debug` passed
+  - `flutter run -d R83XB0ZP37B` passed on physical device
 
 ### Next Steps
 1. **Milestone 1 (Flutter capture UI)**
@@ -849,6 +865,14 @@ See [CONFIG_SYNC.md](app_flutter/CONFIG_SYNC.md) for complete guide.
 ## Appendix: Decisions log
 Record decisions here as you go (date + why).
 
+- 2026-02-27: **Android run/build stability update** -- fixed local Android build/run blockers.
+  - Migrated Android Gradle config to modern Flutter plugin DSL and removed mixed legacy/new setup.
+  - Pinned toolchain versions for compatibility: AGP `8.9.1`, Kotlin `2.1.0`, Gradle `8.11.1`.
+  - Restored missing Android resources required by manifest (`app_name`, `LaunchTheme`, `NormalTheme`).
+  - Simplified `MainActivity.kt` to standard `FlutterActivity` (removed manual plugin registration path).
+  - Removed missing custom font asset references from `pubspec.yaml` to unblock Flutter asset bundling.
+  - Added Kotlin compiler stability flags in `android/gradle.properties` for Windows cache-path issues.
+  - Validation outcome: `flutter build apk --debug` and `flutter run -d R83XB0ZP37B` both passed.
 - 2026-02-21: Flutter chosen for cross-platform UI; Android-first; iOS later via borrowed Mac.
 - 2026-02-21: **Project structure initialized** — monorepo with app_flutter, backend, shared/schemas created.
   - Flutter: pubspec.yaml + full lib structure (features/, core/, app/)
