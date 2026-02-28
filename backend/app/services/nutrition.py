@@ -1,14 +1,13 @@
 """
-Nutrition calculation service — Milestone 3.
+Nutrition calculation service — Milestone 3 / Phase P2.
 - In-memory NUTRITION_DB retained for mock analysis backward compat.
-- DB-backed functions added for real meal persistence queries.
+- DB-backed functions now use the db_factory abstraction (dict-based),
+  compatible with both SQLite dev and Firestore production.
 - Fuzzy food name matching via difflib (stdlib, no extra dep).
 """
 
 import difflib
-from typing import Dict, Any, Optional, List
-from sqlalchemy.orm import Session
-from app.db.models import Food
+from typing import Any, Dict, List, Optional
 
 
 # ─── In-memory DB (used by deterministic mock analysis service) ──────────────
@@ -63,47 +62,50 @@ def _normalize(name: str) -> str:
     return name.lower().strip()
 
 
-def get_food_fuzzy(db: Session, label: str) -> Optional[Food]:
+def get_food_fuzzy(db: Any, label: str) -> Optional[Dict[str, Any]]:
     """
-    Find a Food row by fuzzy matching the given label.
+    Find a food dict by fuzzy matching the given label.
+
+    `db` is the db_factory singleton (NutriLensFirestoreDB or NutriLensSQLiteDB).
 
     Strategy (in order):
-    1. Exact match (case-insensitive)
-    2. Label is a substring of a food name
+    1. Exact match via db.get_food_by_name()
+    2. Label is a substring of any food name (or vice-versa)
     3. Best difflib closest match (cutoff 0.55)
 
-    Returns the Food row or None if nothing is close enough.
+    Returns a food dict or None if nothing is close enough.
     """
     norm_label = _normalize(label)
 
-    # 1. Exact
-    food = db.query(Food).filter(Food.name == norm_label).first()
+    # 1. Exact match
+    food = db.get_food_by_name(norm_label)
     if food:
         return food
 
-    # 2. Substring
-    all_foods: List[Food] = db.query(Food).all()
+    # 2 & 3. Load all foods, run substring + difflib
+    all_foods: List[Dict[str, Any]] = db.get_all_foods()
     for f in all_foods:
-        if norm_label in _normalize(f.name) or _normalize(f.name) in norm_label:
+        if norm_label in _normalize(f["name"]) or _normalize(f["name"]) in norm_label:
             return f
 
-    # 3. difflib
-    names = [_normalize(f.name) for f in all_foods]
+    names = [_normalize(f["name"]) for f in all_foods]
     matches = difflib.get_close_matches(norm_label, names, n=1, cutoff=0.55)
     if matches:
-        return db.query(Food).filter(Food.name == matches[0]).first()
+        for f in all_foods:
+            if _normalize(f["name"]) == matches[0]:
+                return f
 
     return None
 
 
-def compute_macros_from_food(food: Food, grams: int) -> Dict[str, Any]:
-    """Compute macros given a Food ORM object and grams."""
+def compute_macros_from_food(food: Dict[str, Any], grams: int) -> Dict[str, Any]:
+    """Compute macros given a food dict and grams."""
     factor = grams / 100.0
     return {
-        "kcal": int(round(food.kcal_per_100g * factor)),
-        "protein_g": round(food.protein_g_per_100g * factor, 1),
-        "carbs_g": round(food.carbs_g_per_100g * factor, 1),
-        "fat_g": round(food.fat_g_per_100g * factor, 1),
+        "kcal": int(round(food["kcal_per_100g"] * factor)),
+        "protein_g": round(food["protein_g_per_100g"] * factor, 1),
+        "carbs_g": round(food["carbs_g_per_100g"] * factor, 1),
+        "fat_g": round(food["fat_g_per_100g"] * factor, 1),
     }
 
 

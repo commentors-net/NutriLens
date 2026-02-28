@@ -1,18 +1,20 @@
 """
-API routes for meal analysis and management — Milestone 3.
+API routes for meal analysis and management — Phase P2 (Cloud-ready).
+
+POST /meals/analyze  — deterministic mock analysis (unchanged from M2/M3)
+POST /meals          — persist a confirmed meal via db_factory (Firestore / SQLite)
+GET  /meals/today    — daily totals from db_factory
 """
 
-import uuid
 import logging
 import json
-from datetime import datetime, date
+import uuid
+from datetime import date, datetime
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 
-from app.db.session import get_db
-from app.db.models import Meal, MealItem
+from app.db.db_factory import db
 from app.models.schemas import (
     AnalyzeMealResponse,
     MealTotalResponse,
@@ -34,11 +36,10 @@ async def analyze_meal(
     POST /meals/analyze
 
     Accepts multipart form-data with multiple images and optional metadata.
-    Returns deterministic mock analysis for MVP (Milestone 2/3).
+    Returns deterministic mock analysis for MVP.
     """
     if not images:
         raise HTTPException(status_code=400, detail="At least one image is required")
-
     if len(images) < 3:
         raise HTTPException(status_code=400, detail="Minimum 3 photos required")
 
@@ -49,10 +50,7 @@ async def analyze_meal(
         except json.JSONDecodeError:
             logger.warning("Failed to parse metadata JSON")
 
-    image_bytes = []
-    for img in images:
-        content = await img.read()
-        image_bytes.append(content)
+    image_bytes = [await img.read() for img in images]
 
     try:
         analysis = await analyze_images_deterministic(image_bytes, meta_dict)
@@ -63,25 +61,20 @@ async def analyze_meal(
 
 
 @router.post("/")
-async def save_meal(
-    request: SaveMealRequest,
-    db: Session = Depends(get_db),
-):
+async def save_meal(request: SaveMealRequest):
     """
     POST /meals
 
-    Persists a confirmed meal to SQLite.
-    Fuzzy-matches each item label to a Food row, recomputes macros from DB,
-    and stores Meal + MealItem records.
+    Persists a confirmed meal.
+    Fuzzy-matches each item label to a food record, recomputes macros from DB,
+    and stores everything as a single meal document (denormalised, items embedded).
 
     Returns the saved meal's ID, timestamp, item count, and total kcal.
     """
     meal_id = str(uuid.uuid4())
-    timestamp = request.timestamp or datetime.utcnow()
+    timestamp = (request.timestamp or datetime.utcnow()).isoformat()
 
-    meal = Meal(meal_id=meal_id, timestamp=timestamp, notes=request.notes)
-    db.add(meal)
-
+    embedded_items: List[dict] = []
     total_kcal = 0
     unmatched: List[str] = []
 
@@ -89,29 +82,37 @@ async def save_meal(
         food = get_food_fuzzy(db, item.label)
 
         if food is None:
-            # Fall back to macros supplied by the client (already computed)
             logger.warning(f"No DB match for label='{item.label}'; using client macros")
             unmatched.append(item.label)
-            total_kcal += item.macros.kcal
-            # Store with a placeholder food_id so FK is satisfied
+            macros = {
+                "kcal": item.macros.kcal,
+                "protein_g": item.macros.protein_g,
+                "carbs_g": item.macros.carbs_g,
+                "fat_g": item.macros.fat_g,
+            }
             food_id = "unknown"
         else:
             macros = compute_macros_from_food(food, item.grams)
-            total_kcal += macros["kcal"]
-            food_id = food.food_id
+            food_id = food.get("food_id", "unknown")
 
-        db.add(MealItem(
-            item_id=str(uuid.uuid4()),
-            meal_id=meal_id,
-            food_id=food_id,
-            grams=item.grams,
-        ))
+        total_kcal += macros["kcal"]
+        embedded_items.append({
+            "food_id": food_id,
+            "label": item.label,
+            "grams": item.grams,
+            **macros,
+        })
 
-    db.commit()
+    db.save_meal(
+        meal_id=meal_id,
+        timestamp=timestamp,
+        notes=request.notes,
+        items=embedded_items,
+    )
 
     return {
         "meal_id": meal_id,
-        "timestamp": timestamp.isoformat(),
+        "timestamp": timestamp,
         "item_count": len(request.items),
         "total_kcal": total_kcal,
         "unmatched_labels": unmatched,
@@ -120,20 +121,15 @@ async def save_meal(
 
 
 @router.get("/today", response_model=MealTotalResponse)
-async def get_meals_today(db: Session = Depends(get_db)):
+async def get_meals_today():
     """
     GET /meals/today
 
     Returns totals for all meals saved today (UTC date).
-    Joins MealItem → Food to recompute macros from the authoritative DB.
+    Reads embedded item macros — no re-join needed.
     """
-    today = date.today()
-
-    meals_today = (
-        db.query(Meal)
-        .filter(Meal.timestamp >= datetime(today.year, today.month, today.day))
-        .all()
-    )
+    today_str = date.today().isoformat()  # "YYYY-MM-DD"
+    meals = db.get_meals_by_date(today_str)
 
     total_kcal = 0
     total_protein = 0.0
@@ -141,21 +137,16 @@ async def get_meals_today(db: Session = Depends(get_db)):
     total_fat = 0.0
     meal_summaries = []
 
-    for meal in meals_today:
-        meal_kcal = 0
-        for mi in meal.items:
-            if mi.food and mi.food.food_id != "unknown":
-                m = compute_macros_from_food(mi.food, mi.grams)
-                total_kcal += m["kcal"]
-                total_protein += m["protein_g"]
-                total_carbs += m["carbs_g"]
-                total_fat += m["fat_g"]
-                meal_kcal += m["kcal"]
-
+    for meal in meals:
+        meal_kcal = sum(it.get("kcal", 0) for it in meal.get("items", []))
+        total_kcal += meal_kcal
+        total_protein += sum(it.get("protein_g", 0.0) for it in meal.get("items", []))
+        total_carbs += sum(it.get("carbs_g", 0.0) for it in meal.get("items", []))
+        total_fat += sum(it.get("fat_g", 0.0) for it in meal.get("items", []))
         meal_summaries.append({
-            "meal_id": meal.meal_id,
-            "timestamp": meal.timestamp.isoformat(),
-            "item_count": len(meal.items),
+            "meal_id": meal.get("meal_id"),
+            "timestamp": meal.get("timestamp"),
+            "item_count": len(meal.get("items", [])),
             "total_kcal": meal_kcal,
         })
 
@@ -164,6 +155,6 @@ async def get_meals_today(db: Session = Depends(get_db)):
         total_protein_g=round(total_protein, 1),
         total_carbs_g=round(total_carbs, 1),
         total_fat_g=round(total_fat, 1),
-        meal_count=len(meals_today),
+        meal_count=len(meals),
         meals=meal_summaries,
     )

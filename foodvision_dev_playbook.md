@@ -933,8 +933,251 @@ See [CONFIG_SYNC.md](app_flutter/CONFIG_SYNC.md) for complete guide.
 
 ---
 
+## 19) Platform Unification — NutriLens + Leave Tracker on Google Cloud
+
+### 19.1) Leave Tracker — Existing System (as-built, verified Feb 2026)
+
+**Location:** `D:\Jobs\workspace\python-projects\Leave-tracker-app`
+
+#### Infrastructure (confirmed from deploy scripts)
+| Component | Technology | Hosting |
+|-----------|-----------|---------|
+| Backend | FastAPI (Python) | **Google Cloud Run** — service: `leave-tracker-api` |
+| Frontend | React 19 + TypeScript + Vite + MUI | **Cloud Storage bucket** — `{ProjectId}-frontend` (static site) |
+| Database (prod) | **Firestore** | Google Cloud (same project) |
+| Database (dev) | SQLite | Local only |
+| AI | Google Gemini (`gemini-2.0-flash-lite` + fallbacks) | Gemini API |
+
+> ℹ️ **Note:** User referred to this as App Engine — it is actually **Cloud Run** (confirmed: `gcloud run deploy leave-tracker-api` in deploy script, `run.googleapis.com` API enabled).
+
+#### Authentication (custom implementation — no Firebase)
+- Email/password login: password is **never stored** — username is encrypted with password as the key (`core/security.py`)
+- JWT tokens: 30-minute expiration (`python-jose`)
+- 2FA: TOTP via `pyotp` — compatible with Google Authenticator
+- Dev mode: 2FA bypassed when `ENVIRONMENT=development`
+- No Google SSO yet — **to be added** (see §19.4)
+
+#### DB Abstraction Pattern
+```
+db_factory.py
+  ENVIRONMENT=development  →  sqlite_db.py   (local SQLite)
+  ENVIRONMENT=production   →  firestore_db.py (Cloud Firestore)
+```
+This pattern must be preserved and extended for NutriLens.
+
+#### API Endpoints (all live)
+```
+POST  /auth/register
+POST  /auth/login
+POST  /auth/change-password
+
+GET   /api/people
+POST  /api/people
+PUT   /api/people/{id}
+DELETE /api/people/{id}
+
+GET   /api/types
+POST  /api/types
+PUT   /api/types/{id}
+DELETE /api/types/{id}
+
+GET   /api/absences              (filterable: person_id, type_id, date_from, date_to)
+POST  /api/absences
+PATCH /api/absences/{id}
+DELETE /api/absences/{id}
+POST  /api/absences/bulk-delete
+POST  /api/absences/bulk-update-applied
+
+POST  /api/smart-identify        (WhatsApp chat → leave entries via Gemini)
+GET   /api/smart-identify/health
+
+GET   /api/ai-instructions
+PUT   /api/ai-instructions
+POST  /api/ai-instructions/reset
+```
+
+#### Frontend Pages (all live)
+| Page | Route | Purpose |
+|------|-------|---------|
+| `Login.tsx` | `/login` | Login with username + password + 2FA code |
+| `Register.tsx` | `/register` | New user registration (toggle-able via env var) |
+| `Dashboard.tsx` | `/dashboard` | Team absence calendar/view |
+| `Reports.tsx` | `/reports` | Leave summary reports |
+| `SmartIdentification.tsx` | `/smart-identification` | Paste WhatsApp chat → AI extracts leave entries |
+| `Settings.tsx` | `/settings` | AI instructions config, password change |
+
+#### Deployment Scripts (existing, working)
+| Script | Purpose |
+|--------|---------|
+| `deploy-backend-update.ps1` | Backend-only redeploy to Cloud Run |
+| `deploy-frontend.ps1` | Frontend-only redeploy to Cloud Storage |
+| `deploy-to-gcp-complete.ps1` | Full deploy (backend + frontend + Firestore setup) |
+| `deploy-backend-only.ps1` | Backend deploy without frontend |
+
+---
+
+### 19.2) Target Unified Architecture
+
+```
+Google Cloud (same project as Leave Tracker)
+│
+├── Cloud Run Services
+│   ├── leave-tracker-api        ← existing (unchanged)
+│   └── nutrilens-api            ← new FastAPI service
+│
+├── Cloud Storage Buckets
+│   ├── {project}-frontend       ← existing static site (React)
+│   │   Extended with:
+│   │   ├── /login               ← shared login (already exists)
+│   │   ├── /app-select          ← NEW: post-login app chooser
+│   │   ├── /leave-tracker/**    ← existing pages (unchanged)
+│   │   └── /nutrilens/**        ← NEW: admin/logs UI
+│   └── (nutrilens media)        ← optional: uploaded food photos
+│
+├── Firestore
+│   ├── users/                   ← existing Leave Tracker users
+│   ├── leave_records/           ← existing leave data
+│   └── nutrilens_meals/         ← NEW: NutriLens meal logs
+│
+└── Flutter Mobile App (Android/iOS)
+    └── → nutrilens-api only (no web frontend needed for mobile)
+```
+
+**Key principle:** Leave Tracker stays 100% unchanged. NutriLens deploys alongside it as an independent Cloud Run service. The shared frontend is extended, not replaced.
+
+---
+
+### 19.3) Migration Plan (Phased)
+
+#### Phase P1 — Audit & Map (no code changes) — IN PROGRESS
+- [x] Confirm Leave Tracker hosting: Cloud Run + Cloud Storage + Firestore
+- [x] Map all existing API endpoints (§19.1)
+- [x] Map all existing frontend pages (§19.1)
+- [x] Document auth system (JWT + pyotp TOTP, no Firebase)
+- [x] Confirm DB abstraction pattern (db_factory.py)
+- [ ] Note actual Cloud project ID and region from `.env` files
+- [ ] Export Firestore schema (collections + field names)
+
+#### Phase P2 — NutriLens Backend on Cloud Run
+- [x] Add `Dockerfile` to NutriLens backend (follow Leave Tracker pattern) — `backend/Dockerfile`
+- [x] Switch NutriLens DB: SQLite (dev) → Firestore (prod) using same db_factory pattern
+  - `app/db/firestore_db.py` — `NutriLensFirestoreDB` (collections: `nutrilens_foods`, `nutrilens_meals`)
+  - `app/db/sqlite_db_cloud.py` — `NutriLensSQLiteDB` (same interface, SQLite-backed, dict-based)
+  - `app/db/db_factory.py` — `ENVIRONMENT=development` → SQLite, else → Firestore
+- [x] Migrate `nutrition.py` food data → Firestore `nutrilens_foods` collection (seed once via `db.seed_foods()`)
+- [x] Migrate meal persistence → Firestore `nutrilens_meals` collection (embedded items, denormalised)
+- [x] Update `app/services/nutrition.py` — `get_food_fuzzy` + `compute_macros_from_food` use dicts (db-agnostic)
+- [x] Rewrite `app/api/routes_meals.py` — uses `db_factory.db` singleton (no SQLAlchemy Session dep)
+- [x] Update `app/main.py` — startup seeding via `db.seed_foods()` (works for both SQLite + Firestore)
+- [x] Update `requirements.txt` — added `google-cloud-firestore==2.14.0`
+- [x] Update `.env.example` — `ENVIRONMENT`, `GCP_PROJECT_ID`, `DATABASE_URL`
+- [x] Create `deploy-nutrilens-backend.ps1` (mirrors `deploy-backend-update.ps1`)
+- [ ] Test locally with `ENVIRONMENT=development` in `.env`
+- [ ] Deploy to Cloud Run as `nutrilens-api`
+- [ ] Update Flutter `api_config.dart` → Cloud Run URL
+
+#### Phase P3 — Shared Frontend: App Selector
+- [ ] Add `/app-select` route to existing React frontend
+- [ ] Post-login: if user has access to multiple apps → show app picker
+- [ ] App picker cards: 🥗 NutriLens | 🌿 Leave Tracker
+- [ ] If user has access to one app only → redirect directly (no picker shown)
+- [ ] User-app access stored in Firestore `user_apps/{userId}` document
+- [ ] NutriLens admin pages stub (`/nutrilens/dashboard`)
+
+#### Phase P4 — Google SSO (free via Firebase Auth)
+- [ ] Enable Firebase Authentication in the existing GCP project (free tier)
+- [ ] Add `firebase-admin` to Leave Tracker backend requirements
+- [ ] Add Google Sign-In button to `Login.tsx`
+- [ ] On Google SSO success: create/link user in Firestore `users/` collection
+- [ ] Issue same JWT token as email/password login (transparent to rest of app)
+- [ ] Keep existing email/password + 2FA path 100% working
+- [ ] Firebase Auth free tier: up to 10,000 users/month — **no cost**
+
+#### Phase P5 — NutriLens Admin UI
+- [ ] `/nutrilens/meals` — meal log viewer (date, items, macros)
+- [ ] `/nutrilens/nutrition` — food DB browser/editor
+- [ ] `/nutrilens/users` — which users have access (admin only)
+- [ ] Chart: daily kcal trend (recharts or MUI charts)
+
+---
+
+### 19.4) Google SSO Cost Confirmation
+
+| Service | What it covers | Monthly cost |
+|---------|---------------|-------------|
+| Firebase Authentication (free tier) | 10,000 MAU, Google/email sign-in, MFA | **$0** |
+| Cloud Run (existing) | Leave Tracker API | No change |
+| Cloud Run (new) | NutriLens API | ~$0–$5/mo (pay per request, free tier 2M req/mo) |
+| Cloud Storage (existing) | Frontend static files | No change |
+| Firestore (existing) | Leave + NutriLens data | Minimal increase |
+
+**Total additional cost: ~$0–$5/month** for NutriLens Cloud Run service (within free tier for low traffic).
+
+---
+
+### 19.5) NutriLens Dockerfile (to create in Phase P2)
+
+```dockerfile
+# Follow exactly the same pattern as Leave Tracker backend
+FROM python:3.11-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+```
+
+Cloud Run expects port 8080 by default (Leave Tracker uses the same).
+
+---
+
+### 19.6) Unified Monorepo Structure (Phase P2+)
+
+```
+D:\Jobs\workspace\NutriLens\           ← NutriLens monorepo (current)
+D:\Jobs\workspace\python-projects\
+  Leave-tracker-app\                   ← Leave Tracker (separate repo, stays separate)
+```
+
+**Decision: Keep repos separate.** Merging into one monorepo adds complexity with no benefit — both apps deploy independently on Cloud Run. The shared element is only the **frontend React app** (extended, not merged).
+
+---
+
+### 19.7) Things NOT To Change
+
+| Item | Reason |
+|------|--------|
+| Leave Tracker backend code | Live in production, working |
+| Leave Tracker Firestore schema | Existing data would break |
+| Leave Tracker auth (JWT + 2FA) | Working, users have authenticator apps set up |
+| Leave Tracker deploy scripts | Already tested and working |
+| Flutter mobile app architecture | No web dependency, stays independent |
+
+---
+
 ## Appendix: Decisions log
 Record decisions here as you go (date + why).
+
+- 2026-02-28: **Platform unification decision** — NutriLens backend will deploy to Google Cloud alongside the existing Leave Tracker, sharing the same GCP project.
+  - Leave Tracker confirmed on **Cloud Run** (not App Engine as initially assumed) — service `leave-tracker-api`; frontend on Cloud Storage static bucket.
+  - Both apps use the same tech stack (FastAPI + React + TypeScript + Firestore), so integration cost is low.
+  - **Repos stay separate** — Leave Tracker remains in its own repo; NutriLens merges nothing. Only the React frontend is extended with an app-selector and NutriLens admin pages.
+  - **Google SSO** added via Firebase Authentication (free tier, ≤10K MAU) — existing email/password + 2FA path preserved untouched.
+  - NutriLens mobile (Flutter) talks only to `nutrilens-api` Cloud Run service; no dependency on Leave Tracker.
+  - Additional monthly cost estimated $0–$5 for NutriLens Cloud Run service (within free tier for dev/test traffic).
+  - Full plan documented in §19. Phase P1 (audit) complete; Phase P2 (NutriLens backend → Cloud Run) is next.
+
+- 2026-02-28: **Phase P2 — DB abstraction layer implemented** — NutriLens backend now has Firestore + SQLite db_factory mirroring the Leave Tracker pattern.
+  - `backend/Dockerfile` — `python:3.11`, port 8080, identical to Leave Tracker.
+  - `app/db/firestore_db.py` — `NutriLensFirestoreDB`: `nutrilens_foods` (seeded with 55 foods), `nutrilens_meals` (denormalised, items embedded per doc). Methods: `seed_foods`, `get_all_foods`, `get_food_by_name`, `get_food_count`, `save_meal`, `get_meals_by_date`.
+  - `app/db/sqlite_db_cloud.py` — `NutriLensSQLiteDB`: same public interface, backed by plain SQLite tables + JSON column for items. `DATABASE_URL` env var controls file path.
+  - `app/db/db_factory.py` — factory: `ENVIRONMENT=development` returns `sqlite_db`, else returns `firestore_db`. Singleton `db` object imported across the app.
+  - `app/services/nutrition.py` — `get_food_fuzzy(db, label)` + `compute_macros_from_food(food, grams)` now fully dict-based (no SQLAlchemy dependency).
+  - `app/api/routes_meals.py` — `POST /meals` + `GET /meals/today` use `db_factory.db` singleton; no `Depends(get_db)` or SQLAlchemy imports.
+  - `app/main.py` — lifespan seeding calls `db.seed_foods(_seed_data())` from FOOD_SEED_DATA tuples; works for both SQLite (dev) and Firestore (prod).
+  - `requirements.txt` — added `google-cloud-firestore==2.14.0`.
+  - `.env.example` — updated with `ENVIRONMENT`, `GCP_PROJECT_ID`, `DATABASE_URL`.
+  - `deploy-nutrilens-backend.ps1` — 4-step deploy: configure project → ensure Artifact Registry repo → Cloud Build → `gcloud run deploy nutrilens-api` with `ENVIRONMENT=production,GCP_PROJECT_ID=leave-tracker-2025`.
 
 - 2026-02-28: **Milestone 3 nutrition DB implementation** — real SQLite DB, 55 foods seeded, fuzzy matching, save/today endpoints, Flutter Home shows daily totals.
   - `app/db/models.py` — SQLAlchemy ORM: `Food`, `Meal`, `MealItem` with proper FK relationships (`MealItem → meals` + `→ foods`).
