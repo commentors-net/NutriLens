@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:camera/camera.dart';
+import 'package:go_router/go_router.dart';
 import 'capture_controller.dart';
-import 'review_screen.dart';
+import '../../app/router.dart';
 import '../../core/utils/permission_handler.dart' as app_permissions;
 
 /// Camera capture screen for taking multiple photos of a meal
@@ -105,11 +106,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
   }
 
   void _navigateToReview() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const ReviewScreen(),
-      ),
-    );
+    context.push(AppRoutes.review);
   }
 
   void _openSettings() async {
@@ -170,7 +167,10 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
           left: 0,
           right: 0,
           bottom: 0,
-          child: _buildControls(captureState),
+          child: SafeArea(
+            top: false,
+            child: _buildControls(captureState),
+          ),
         ),
       ],
     );

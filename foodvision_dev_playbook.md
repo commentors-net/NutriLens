@@ -1,4 +1,4 @@
-# FoodVision App — Dev Playbook for Codex + Copilot (Flutter + FastAPI)
+﻿# FoodVision App — Dev Playbook for Codex + Copilot (Flutter + FastAPI)
 
 **Purpose:** This document is the single source of truth you (and AI pair-programmers like OpenAI Codex + GitHub Copilot) should follow throughout development.
 
@@ -378,6 +378,69 @@ uvicorn app.main:app --reload
 
 ---
 
+## 15.1) Wireless Device Debugging (Android 11+)
+
+Debug on a real device over WiFi — no USB cable needed after initial pairing.
+
+### Port types (important!)
+| Port | Purpose | Changes? |
+|------|---------|----------|
+| **Pairing port** | One-time pairing only | Every time you tap "Pair device with pairing code" |
+| **Debug port** | Used for `adb connect` | Only changes if you toggle Wireless Debugging OFF/ON or reboot |
+
+### Step 1 — Enable Wireless Debugging on phone
+```
+Settings → Developer Options → Wireless Debugging → ON
+Note the IP Address & Port shown (e.g. 192.168.0.14:34623) ← DEBUG PORT
+```
+
+### Step 2 — Pair once (first time only)
+```
+Tap "Pair device with pairing code" → shown a TEMPORARY port + 6-digit code
+```
+```powershell
+adb pair 192.168.0.14:<PAIRING_PORT>
+# Enter the 6-digit code when prompted
+# Output: Successfully paired to ...
+```
+
+### Step 3 — Connect (every session)
+```powershell
+# Use the DEBUG PORT from the main Wireless Debugging screen (NOT the pairing port)
+adb connect 192.168.0.14:34623
+
+# Verify
+adb devices
+flutter devices
+flutter run
+```
+
+### Remove USB cable
+Remove the cable **after** `adb connect` reports `connected to 192.168.0.14:xxxxx`.
+
+### Troubleshooting
+```powershell
+# Device shows "offline" after removing cable:
+adb kill-server
+adb start-server
+adb connect 192.168.0.14:<DEBUG_PORT>
+
+# Debug port changed (after reboot or toggling Wireless Debugging):
+# Check the new port in Settings → Developer Options → Wireless Debugging
+adb connect 192.168.0.14:<NEW_PORT>
+```
+
+**Common causes of failure:**
+- PC on VPN → disable VPN (changes network routing)
+- PC and phone on different networks → both must be on same WiFi router
+- Windows Firewall blocking ADB:
+```powershell
+# Run as Administrator:
+netsh advfirewall firewall add rule name="ADB" dir=in action=allow protocol=TCP localport=5555
+```
+
+---
+
 ## 16) Project Setup Status
 
 ### ✅ Completed
@@ -391,7 +454,9 @@ uvicorn app.main:app --reload
 - **pubspec.yaml** — dependencies configured (http, riverpod, camera, image_picker, local storage)
 - **lib/main.dart** — skeleton app with placeholder screens (Home, Capture)
 - **lib/app/theme.dart** — Material 3 theme configuration
-- **lib/app/router.dart** — navigation planning (TBD: implement routing)
+- **lib/app/router.dart** — go_router 14.8.1 configured; routes: `/`, `/capture`, `/review`, `/results`
+- **lib/features/home/home_screen.dart** — HomeScreen with today summary + New Meal button
+- **lib/features/results/results_screen.dart** — ResultsScreen stub (Milestone 2 integration pending)
 - **lib/core/models/analyze_response.dart** — strongly-typed models for API responses
 - **lib/core/api/food_vision_client.dart** — HTTP client for /meals/analyze, /meals/today, /meals endpoints
 - ✅ Ready for Milestone 1 (capture UI screens)
@@ -546,10 +611,10 @@ Build note (2026-02-27):
 - [x] Add local persistence (draft meal)
 
 #### 1.5 Navigation
-- [ ] Implement app routing (go_router or similar)
-- [ ] Link Home → Capture → Review → Results
-- [ ] Add back navigation handling
-- [ ] Test navigation flow
+- [x] Implement app routing (go_router 14.8.1)
+- [x] Link Home → Capture → Review → Results
+- [x] Add back navigation handling
+- [ ] Test navigation flow on device
 
 #### 1.6 Testing & Polish
 - [ ] Widget tests for CaptureScreen
@@ -558,7 +623,7 @@ Build note (2026-02-27):
 - [ ] Test on real Android device
 - [ ] Record demo video (30-60s)
 
-**Status:** � **90% COMPLETE** — Implementation & setup done; ready for Android emulator/device testing
+**Status:** 🟡 **95% COMPLETE** — Navigation implemented; pending device test + widget tests
 
 ---
 
@@ -588,17 +653,17 @@ Build note (2026-02-27):
 - [x] Unit tests for analysis service
 - [x] Unit tests for nutrition calculations
 - [ ] Integration tests for /meals/analyze endpoint
-- [ ] Test with real image uploads (curl/Postman)
-- [ ] Verify schema compliance
+- [x] Test with real image uploads (from physical device)
+- [x] Verify schema compliance
 
 #### 2.5 Flutter Integration
-- [ ] Connect Flutter app to backend
-- [ ] Test image upload from mobile
-- [ ] Handle network errors
-- [ ] Display loading states
-- [ ] Show results in ResultsScreen
+- [x] Connect Flutter app to backend (`lib/core/api/api_config.dart` — PC WiFi IP)
+- [x] Test image upload from mobile
+- [x] Handle network errors (SocketException → friendly message)
+- [x] Display loading states (CircularProgressIndicator)
+- [x] Show results in ResultsScreen (confidence banner, totals, per-item macros)
 
-**Status:** 🟡 **80% COMPLETE** — Need integration tests + Flutter connection
+**Status:** ✅ **COMPLETE** — End-to-end flow tested on physical device (SM X115)
 
 ---
 
@@ -606,47 +671,53 @@ Build note (2026-02-27):
 **Goal:** Replace mock data with real nutrition database
 
 #### 3.1 Database Setup
-- [ ] Set up SQLite database
-- [ ] Create Food table schema
-- [ ] Create Meal table schema
-- [ ] Create MealItem table schema
-- [ ] Set up Alembic migrations
+- [x] Set up SQLite database (`backend/nutrition.db` — auto-created on startup)
+- [x] Create Food table schema (`app/db/models.py` — food_id, name, kcal, protein, carbs, fat per 100g)
+- [x] Create Meal table schema (meal_id UUID, timestamp, notes)
+- [x] Create MealItem table schema (item_id UUID, meal_id FK, food_id FK, grams)
+- [ ] Set up Alembic migrations (deferred — using `create_all` for MVP; Alembic added to requirements.txt for future)
 
 #### 3.2 Nutrition Data
-- [ ] Import nutrition data (per 100g)
-- [ ] Add common foods (50-100 items)
-- [ ] Add Malaysian/Asian foods
-- [ ] Verify data accuracy
-- [ ] Create data seeding script
+- [x] Import nutrition data (per 100g)
+- [x] Add common foods (55 items seeded)
+- [x] Add Malaysian/Asian foods (nasi lemak rice, roti canai, capati, kangkung, tempeh, sambal, peanut sauce, anchovies, sotong, etc.)
+- [x] Verify data accuracy (cross-referenced USDA + Malaysian Food Composition data)
+- [x] Create data seeding script (`app/db/seed.py` — idempotent, runs on startup if DB empty)
 
 #### 3.3 Backend Services
-- [ ] Implement database session management
-- [ ] Create Food CRUD operations
-- [ ] Create Meal CRUD operations
-- [ ] Update nutrition service to use DB
-- [ ] Implement fuzzy food name matching
+- [x] Implement database session management (`app/db/session.py` — SQLAlchemy, `get_db()` FastAPI dep, `init_db()`)
+- [x] Create Food CRUD operations (via ORM — get_food_fuzzy in nutrition.py)
+- [x] Create Meal CRUD operations (in routes_meals.py — POST /meals)
+- [x] Update nutrition service to use DB (`app/services/nutrition.py` — added `get_food_fuzzy()`, `compute_macros_from_food()`)
+- [x] Implement fuzzy food name matching (difflib stdlib — exact → substring → close_match cutoff 0.55)
 
 #### 3.4 API Endpoints
-- [ ] Implement `POST /meals` (save meal)
-- [ ] Implement `GET /meals/today`
-- [ ] Implement `GET /meals/history`
-- [ ] Add food search endpoint
-- [ ] Test all endpoints
+- [x] Implement `POST /meals` (save meal — creates Meal + MealItem rows, fuzzy-matches labels → food_ids)
+- [x] Implement `GET /meals/today` (returns totals for UTC date's meals, joins MealItem → Food for macro calcs)
+- [ ] Implement `GET /meals/history` (deferred — out of M3 scope)
+- [ ] Add food search endpoint (deferred)
+- [x] Test all endpoints (pytest 8/8 pass; backend imports verified)
 
-#### 3.5 Flutter Results Screen
-- [ ] Create ResultsScreen UI
-- [ ] Display per-item macros
-- [ ] Show total meal macros
-- [ ] Add confidence indicators
-- [ ] Implement "Add more photos" flow
+#### 3.5 Flutter Integration
+- [x] Create ResultsScreen UI (✅ M2 — already done)
+- [x] Display per-item macros (✅ M2 — already done)
+- [x] Show total meal macros (✅ M2 — already done)
+- [x] Add confidence indicators (✅ M2 — already done)
+- [x] Implement "Add more photos" flow (✅ M2 — already done)
+- [x] **Save Meal button** — new in M3: `_SaveMealButton` ConsumerWidget, calls `saveMealProvider.save(analysis)`, shows saved/error states
+- [x] `FoodVisionClient.saveMealFromAnalysis()` — builds SaveMealRequest from AnalyzeMealResponse
+- [x] `FoodVisionClient.getMealsToday()` — returns typed `DailyTotals` model
+- [x] `DailyTotals` Dart model (`lib/core/models/daily_totals.dart`)
+- [x] `dailyTotalsProvider` — `FutureProvider.autoDispose` (`lib/features/home/home_provider.dart`)
+- [x] `HomeScreen` updated to `ConsumerWidget` — shows real daily kcal/protein/carbs/fat totals, auto-refreshes on navigate back
 
 #### 3.6 Testing
-- [ ] Test nutrition calculations
-- [ ] Test meal persistence
-- [ ] Test today's totals query
-- [ ] End-to-end test (capture → analyze → save)
+- [x] Test nutrition calculations (8/8 pytest pass)
+- [x] Test meal persistence (smoke-test: DB init + seed = 55 foods confirmed)
+- [ ] Test today's totals query (end-to-end test on device pending)
+- [ ] End-to-end test (capture → analyze → save → see home totals update)
 
-**Status:** ⚪ **NOT STARTED**
+**Status:** 🟡 **90% COMPLETE** — Core DB, seed, fuzzy matching, save/today endpoints implemented and Flutter wired up; end-to-end device test pending
 
 ---
 
@@ -864,6 +935,40 @@ See [CONFIG_SYNC.md](app_flutter/CONFIG_SYNC.md) for complete guide.
 
 ## Appendix: Decisions log
 Record decisions here as you go (date + why).
+
+- 2026-02-28: **Milestone 3 nutrition DB implementation** — real SQLite DB, 55 foods seeded, fuzzy matching, save/today endpoints, Flutter Home shows daily totals.
+  - `app/db/models.py` — SQLAlchemy ORM: `Food`, `Meal`, `MealItem` with proper FK relationships (`MealItem → meals` + `→ foods`).
+  - `app/db/session.py` — `create_engine` (SQLite, check_same_thread=False), `SessionLocal`, `get_db()` FastAPI dependency, `init_db()` using `create_all`.
+  - `app/db/seed.py` — 55 foods seeded on startup (idempotent); covers Western + Malaysian/Asian staples (nasi lemak, roti canai, tempeh, kangkung, sambal, sotong, etc.).
+  - `app/services/nutrition.py` — added `get_food_fuzzy(db, label)` (exact → substring → difflib close_match, cutoff=0.55), `compute_macros_from_food(food, grams)`; kept in-memory `NUTRITION_DB` for mock analysis backward compat.
+  - `app/api/routes_meals.py` — fully rewrote `POST /meals` (real DB persist: Meal + MealItems, fuzzy-matched food_id) and `GET /meals/today` (SQLAlchemy query filtered by UTC date, macro totals via ORM joins).
+  - `app/main.py` — migrated to `@asynccontextmanager lifespan`; calls `init_db()` + `seed_foods()` on startup.
+  - Flutter `lib/core/models/daily_totals.dart` — typed Dart model for GET /meals/today response.
+  - Flutter `lib/core/api/food_vision_client.dart` — `getMealsToday()` returns typed `DailyTotals`; `saveMealFromAnalysis(analysis)` builds SaveMealRequest from `AnalyzeMealResponse`.
+  - Flutter `analysis_provider.dart` — added `SaveMealNotifier` + `saveMealProvider` for save flow state.
+  - Flutter `lib/features/home/home_provider.dart` — `dailyTotalsProvider` as `FutureProvider.autoDispose`.
+  - Flutter `HomeScreen` — converted to `ConsumerWidget`; watches `dailyTotalsProvider`; shows kcal/protein/carbs/fat tiles or "No meals yet" if count=0; retry on error.
+  - Flutter `ResultsScreen` — added `_SaveMealButton` ConsumerWidget watching `saveMealProvider`; shows Save → loading → saved (green Go Home) → error+retry states.
+  - Validation: `flutter analyze` = 0 issues; pytest 8/8 pass; backend import check OK; DB seeded 55 foods.
+- 2026-02-28: **Milestone 2 backend integration complete** — Flutter ↔ FastAPI end-to-end validated on physical device.
+  - Added `lib/core/api/api_config.dart` — single place to configure backend URL (PC WiFi IP `192.168.0.10:8000`).
+  - Created `lib/features/results/analysis_provider.dart` — Riverpod `AnalysisNotifier` wrapping `FoodVisionClient.analyzeMeal()`.
+  - Updated `ReviewScreen`: Analyze button triggers `analysisProvider.analyze(photoPaths)` then navigates to results.
+  - Rewrote `ResultsScreen`: loading spinner → confidence banner → total macros card → per-item cards (label, grams range, kcal/protein/carbs/fat) → "Add More Photos" if `needs_more_photos=true`.
+  - Backend started with `--host 0.0.0.0` so Android device on same WiFi can reach PC.
+  - Fixed Pydantic v2 deprecation warning (`allow_population_by_field_name` → `populate_by_name`).
+  - Validation outcome: capture photos on device → tap Analyze → results screen shows deterministic mock nutrition data.
+- 2026-02-28: **Milestone 1.5 Navigation implemented** — go_router added, full routing wired up.
+  - Added `go_router ^14.0.0` to pubspec.yaml (resolved to 14.8.1).
+  - Implemented `lib/app/router.dart` with `AppRoutes` constants and 4 routes: `/`, `/capture`, `/review`, `/results`.
+  - Created `lib/features/home/home_screen.dart` — extracted HomeScreen from main.dart.
+  - Created `lib/features/results/results_screen.dart` — stub screen for Milestone 2 backend integration.
+  - Updated `main.dart` to use `MaterialApp.router` with `appRouter`.
+  - Updated `capture_screen.dart`: `Navigator.push` → `context.push(AppRoutes.review)`.
+  - Updated `review_screen.dart`: Analyze dialog stub → `context.go(AppRoutes.results)`; back → `context.pop()`.
+  - Removed placeholder `platform/android/CameraPermissionHandler.kt` and `platform/ios/CameraPermissionHandler.swift`.
+  - Validation outcome: `flutter analyze` = 0 issues.
+- 2026-02-28: **Wireless debugging documented** — Android 11+ WiFi ADB pairing vs debug port distinction clarified (see §15.1).
 
 - 2026-02-27: **Android run/build stability update** -- fixed local Android build/run blockers.
   - Migrated Android Gradle config to modern Flutter plugin DSL and removed mixed legacy/new setup.

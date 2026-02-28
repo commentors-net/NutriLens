@@ -1,7 +1,10 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'capture_controller.dart';
+import '../../app/router.dart';
+import '../results/analysis_provider.dart';
 
 /// Review screen for viewing and managing captured photos before analysis
 class ReviewScreen extends ConsumerWidget {
@@ -18,8 +21,8 @@ class ReviewScreen extends ConsumerWidget {
           if (captureState.hasMinPhotos)
             TextButton(
               onPressed: () {
-                // TODO: Navigate to analysis or call analyze API
-                _showAnalyzeDialog(context);
+                ref.read(analysisProvider.notifier).analyze(captureState.photoPaths);
+                context.go(AppRoutes.results);
               },
               child: const Text(
                 'Analyze',
@@ -46,7 +49,7 @@ class ReviewScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 24),
             ElevatedButton.icon(
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed: () => context.pop(),
               icon: const Icon(Icons.camera_alt),
               label: const Text('Take Photos'),
             ),
@@ -199,7 +202,9 @@ class ReviewScreen extends ConsumerWidget {
   }
 
   Widget _buildBottomActions(BuildContext context, WidgetRef ref, captureState) {
-    return Container(
+    return SafeArea(
+      top: false,
+      child: Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -217,7 +222,7 @@ class ReviewScreen extends ConsumerWidget {
           if (!captureState.hasMaxPhotos)
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: () => Navigator.of(context).pop(),
+                onPressed: () => context.pop(),
                 icon: const Icon(Icons.add_a_photo),
                 label: const Text('Add More'),
               ),
@@ -231,8 +236,8 @@ class ReviewScreen extends ConsumerWidget {
             Expanded(
               child: ElevatedButton.icon(
                 onPressed: () {
-                  // TODO: Navigate to analysis or call analyze API
-                  _showAnalyzeDialog(context);
+                  ref.read(analysisProvider.notifier).analyze(captureState.photoPaths);
+                  context.go(AppRoutes.results);
                 },
                 icon: const Icon(Icons.analytics),
                 label: const Text('Analyze Meal'),
@@ -242,6 +247,7 @@ class ReviewScreen extends ConsumerWidget {
               ),
             ),
         ],
+      ),
       ),
     );
   }
@@ -270,25 +276,6 @@ class ReviewScreen extends ConsumerWidget {
               'Delete',
               style: TextStyle(color: Colors.red),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showAnalyzeDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Analyze Meal'),
-        content: const Text(
-          'This feature will be implemented in Milestone 2.\n\n'
-          'It will send photos to the backend API and display nutrition results.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('OK'),
           ),
         ],
       ),

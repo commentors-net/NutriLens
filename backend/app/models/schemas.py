@@ -41,8 +41,7 @@ class Macros(BaseModel):
     carbs_g: float = Field(..., alias="carbs_g")
     fat_g: float = Field(..., alias="fat_g")
 
-    class Config:
-        allow_population_by_field_name = True
+    model_config = {"populate_by_name": True}
 
 
 class AnalyzeItem(BaseModel):
