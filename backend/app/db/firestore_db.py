@@ -112,5 +112,16 @@ class NutriLensFirestoreDB:
         return [{"id": d.id, **d.to_dict()} for d in docs]
 
 
-# Global singleton — import and use directly in routes / services.
-firestore_db = NutriLensFirestoreDB()
+# Lazy singleton — only instantiate when actually needed (i.e., when ENVIRONMENT != development)
+_firestore_db_instance = None
+
+
+def get_firestore_db() -> NutriLensFirestoreDB:
+    global _firestore_db_instance
+    if _firestore_db_instance is None:
+        _firestore_db_instance = NutriLensFirestoreDB()
+    return _firestore_db_instance
+
+
+# For backward compatibility with existing code that imports firestore_db directly
+firestore_db = None  # Will be set by db_factory when needed

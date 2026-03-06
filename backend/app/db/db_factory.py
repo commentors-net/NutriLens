@@ -11,6 +11,10 @@ Usage anywhere in the app:
 """
 
 import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file (if it exists)
+load_dotenv()
 
 
 def get_database():
@@ -19,8 +23,8 @@ def get_database():
         from app.db.sqlite_db_cloud import sqlite_db
         return sqlite_db
     else:
-        from app.db.firestore_db import firestore_db
-        return firestore_db
+        from app.db.firestore_db import get_firestore_db
+        return get_firestore_db()
 
 
 db = get_database()

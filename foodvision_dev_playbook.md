@@ -1,5 +1,64 @@
 ﻿# FoodVision App — Dev Playbook for Codex + Copilot (Flutter + FastAPI)
 
+---
+
+## ▶ RESUME HERE — Last session: 2026-02-28
+## ▶ RESUME HERE — Last session: 2026-03-06
+
+### What was just completed (Phase P2 — Backend Development + Cloud Run Deployment) ✅
+All code written, tested (pytest 8/8), and DEPLOYED to Cloud Run.
+
+| File | Status |
+|------|--------|
+| `backend/Dockerfile` | ✅ Created — `python:3.11`, port `8080` |
+| `backend/app/db/firestore_db.py` | ✅ `NutriLensFirestoreDB` — `nutrilens_foods` + `nutrilens_meals` |
+| `backend/app/db/sqlite_db_cloud.py` | ✅ `NutriLensSQLiteDB` — same interface, SQLite-backed |
+| `backend/app/db/db_factory.py` | ✅ `ENVIRONMENT=development` → SQLite, else → Firestore |
+| `backend/app/services/nutrition.py` | ✅ `get_food_fuzzy` + `compute_macros_from_food` now dict-based |
+| `backend/app/api/routes_meals.py` | ✅ Uses `db_factory.db` singleton (no SQLAlchemy) |
+| `backend/app/main.py` | ✅ Lifespan seeding via `db.seed_foods()` |
+| `backend/requirements.txt` | ✅ Added `google-cloud-firestore==2.14.0` |
+| `backend/.env.example` | ✅ Updated with `ENVIRONMENT`, `GCP_PROJECT_ID` |
+| `deploy-nutrilens-backend.ps1` | ✅ Created & tested — successful Cloud Run deployment |
+| `backend/app/db/db_factory.py` | ✅ Fixed — added .env loading with python-dotenv |
+| `backend/app/db/firestore_db.py` | ✅ Fixed — lazy singleton initialization |
+| `app_flutter/lib/core/api/api_config.dart` | ✅ Updated to use Cloud Run URL |
+
+### Deployment Results ✅
+
+**Cloud Run Service:** `nutrilens-api`
+**Service URL:** `https://nutrilens-api-427212681311.us-central1.run.app`
+**Status:** ✅ Deployed and verified (health check + /meals/today tested)
+**Database:** Firestore in production, SQLite in local dev
+**Artifact Registry:** `us-central1-docker.pkg.dev/leave-tracker-2025/nutrilens-repo/backend:latest`
+
+### Next steps (Phase P3 & P4)
+
+#### Ready to implement NOW:
+- **Phase P3:** Add `/app-select` page to the existing Leave Tracker React frontend; app-picker cards for NutriLens + Leave Tracker
+- **Phase P4:** Google SSO via Firebase Authentication (free tier); add to both apps
+
+#### Notes for future sessions:
+- Firestore indexes: If `GET /meals/today` shows index errors in Cloud Run logs, create single-field index on `nutrilens_meals.date_str`
+- Local development: Edit `api_config.dart` to uncomment local URL when testing against local backend
+- Redeploy: Run `.\deploy-nutrilens-backend.ps1` from workspace root
+
+### Key constants (don't look these up again)
+| Item | Value |
+|------|-------|
+| GCP project | `leave-tracker-2025` |
+| Cloud Run region | `us-central1` |
+| Leave Tracker service | `leave-tracker-api` |
+| NutriLens service | `nutrilens-api` (deployed ✅) |
+| NutriLens URL | `https://nutrilens-api-427212681311.us-central1.run.app` |
+| Firestore collections | `nutrilens_foods`, `nutrilens_meals` |
+| Device ID (WiFi ADB) | `adb-R83XB0ZP37B-4CiXOn._adb-tls-connect._tcp.` |
+| PC local IP | `192.168.0.10` |
+| Device IP | `192.168.0.14` |
+| Flutter run command | `cd app_flutter ; flutter run -d adb-R83XB0ZP37B-4CiXOn._adb-tls-connect._tcp.` |
+
+---
+
 **Purpose:** This document is the single source of truth you (and AI pair-programmers like OpenAI Codex + GitHub Copilot) should follow throughout development.
 
 **Target:** Cross‑platform (Android + iOS later) food photo logging + AI analysis:
