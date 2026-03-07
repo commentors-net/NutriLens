@@ -4,24 +4,123 @@
 
 ## ▶ RESUME HERE — Last session: 2026-02-28
 ## ▶ RESUME HERE — Last session: 2026-03-06
-## ▶ RESUME HERE — Last session: 2026-03-07
+## ▶ RESUME HERE — Last session: 2026-03-07 (Morning)
+## ▶ RESUME HERE — Last session: 2026-03-07 (Evening) — End-to-End Validation Complete ✅
 
-### What was just completed (Phase P3.5 — Monorepo Consolidation) ✅
-Leave Tracker was merged into shared root folders so both products are managed from one `backend/` and one `frontend/`.
+**STATUS AT SESSION END (2026-03-07 Evening):**
+Phase P3.5 (Unified Monorepo + Single Backend Runtime) is **COMPLETE and VALIDATED**.
 
-| File | Status |
-|------|--------|
-| `backend/app/leave_tracker/**` | ✅ Leave Tracker backend merged under shared backend app folder |
+**What was verified:**
+✅ Frontend TypeScript builds without errors (MUI Grid v7 compatible)
+✅ Backend starts with single `uvicorn` command serving both systems
+✅ All health endpoints work: `/health`, `/nutrilens/health`, `/leave-tracker/health`, `/auth/health`
+✅ All system-specific routes present in OpenAPI schema
+✅ Leave Tracker registration: POST `/auth/register` → creates user + 2FA QR + secret ✓
+✅ NutriLens registration: POST `/nutrilens/auth/register` → creates user ✓
+✅ Leave Tracker login: POST `/auth/login` → returns JWT token ✓
+✅ NutriLens login: POST `/nutrilens/auth/login` → returns JWT token ✓
+✅ Leave Tracker login (alt): POST `/leave-tracker/auth/login` → returns JWT token ✓
+✅ NutriLens login (alt): POST `/nutrilens/auth/login` → returns JWT token ✓
+✅ Protected endpoints enforce authentication: GET `/api/people` → 403 without token ✓
+✅ Protected endpoints enforce authentication: GET `/leave-tracker/api/people` → 403 without token ✓
+✅ Frontend loads at http://localhost:5174 (port adjusted from 5173 due to availability)
+✅ VS Code launch.json configured for full-stack startup
+
+---
+
+## NEXT SESSION RESUMPTION STEPS (2026-03-08+)
+
+### Option 1: Continue with Dev Features (Phase P4)
+1. Pick next phase from roadmap (Google SSO, more AI features, etc.)
+2. Start services: VS Code Debug → "Full Stack: Unified Backend + Frontend"
+3. Reference test credentials created 2026-03-07:
+   - Leave Tracker: `testuser_lt` / `Password123!` (2FA secret in playbook below)
+   - NutriLens: `testuser_nl` / `Password123!`
+
+### Option 2: Deploy to Cloud
+1. Run: `.\deploy-leave-tracker-complete.ps1 -ProjectId <gcp-project> -SecretKey <path> -GeminiApiKey <key>`
+2. Or: `.\deploy-nutrilens-backend.ps1` (for NutriLens backend only)
+
+### Option 3: Test on Device (Flutter)
+1. Ensure backend running: `cd backend; ..\.venv\Scripts\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8000`
+2. Update `app_flutter/lib/core/api/api_config.dart` to point to PC local IP (if not already)
+3. Run: `cd app_flutter; flutter run -d <device-id>`
+
+---
+
+## TEST CREDENTIALS (2026-03-07)
+Generated during end-to-end validation:
+- **Leave Tracker User:**
+  - Username: `testuser_lt`
+  - Password: `Password123!`
+  - 2FA Secret: `UOCJUW5QYIVOC2E4QP7RI4YN7JUJPSPH`
+  - ID: `db087eae-a057-4a2d-872e-b77ebd4112ec`
+- **NutriLens User:**
+  - Username: `testuser_nl`
+  - Password: `Password123!`
+  - ID: `f540bd57-7417-41ef-b3d6-ea4bddfbe215`
+
+---
+
+### What was just completed (Phase P3.5 — Unified Monorepo + Single Backend Runtime) ✅
+Completed full consolidation of Leave Tracker into NutriLens repository with merged backend and frontend, enabling one-command deployment and unified cloud service.
+
+| File/Task | Status |
+|-----------|--------|
+| `backend/app/leave_tracker/**` | ✅ Leave Tracker backend integrated into unified backend app folder |
+| `backend/app/main.py` | ✅ Unified FastAPI entrypoint mounting both NutriLens + Leave Tracker routers |
 | `frontend/**` | ✅ Leave Tracker React frontend moved to root frontend folder |
-| `deploy-leave-tracker-backend.ps1` | ✅ Updated — deploys Leave Tracker from unified backend |
+| `deploy-leave-tracker-backend.ps1` | ✅ Updated — deploys from unified backend structure |
 | `deploy-leave-tracker-frontend.ps1` | ✅ Updated — deploys from root frontend folder |
 | `deploy-leave-tracker-complete.ps1` | ✅ Updated — full deploy using unified structure |
+| `frontend/src/pages/AppSelect.tsx` | ✅ System selector (Leave Tracker / NutriLens cards) |
+| `frontend/src/pages/Login.tsx` | ✅ System-aware login routing (`/leave-tracker/login` vs `/nutrilens/login`) |
+| `frontend/src/services/api.ts` | ✅ Auth client with system-specific endpoint selection |
+| `frontend/src/App.tsx` | ✅ Multi-system routing + navigation |
+| `frontend/src/pages/NutriLensPortal.tsx` | ✅ NutriLens landing page placeholder |
+| `.vscode/launch.json` | ✅ Unified backend + frontend startup configuration |
 
-**Root deploy commands now available:**
-- `./deploy-nutrilens-backend.ps1`
-- `./deploy-leave-tracker-backend.ps1`
-- `./deploy-leave-tracker-frontend.ps1`
-- `./deploy-leave-tracker-complete.ps1 -ProjectId <id> -SecretKey <secret> -GeminiApiKey <key>`
+**Backend Route Summary:**
+- NutriLens: `/meals`, `/nutrilens/meals`, `/nutrilens/auth`
+- Leave Tracker legacy: `/auth`, `/api` (CRUD people/types/absences/smart-id/ai-instructions)
+- Leave Tracker namespaced: `/leave-tracker/auth`, `/leave-tracker/api`
+- Health checks: `/health`, `/nutrilens/health`, `/leave-tracker/health`, `/auth/health`
+
+**One-Command Startup (Dev):**
+```bash
+# Terminal 1: Backend (http://localhost:8000)
+cd backend
+..\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+
+# Terminal 2: Frontend (http://localhost:5173)
+cd frontend
+npm run dev
+
+# OR use VS Code launch config for both together:
+# Debug → "Full Stack: Unified Backend + Frontend"
+```
+
+**Single-Cloud Deployment:**
+- One NutriLens Cloud Run instance (`nutrilens-api`) now serves both systems via route namespacing
+- One backend entrypoint exposes both product APIs
+- Frontend system selector handles logout and per-system navigation
+
+**Validation Results:**
+✅ Frontend TypeScript build passes (MUI Grid v7 compatible)
+✅ One backend process mounts both routers successfully
+✅ OpenAPI schema includes paths for both systems
+✅ All health endpoints respond (GET /health, /nutrilens/health, /leave-tracker/health, /auth/health)
+✅ Auth endpoints reachable all three paths (/auth/login, /leave-tracker/auth/login, /nutrilens/auth/login)
+✅ Dependency merge complete (pyotp, qrcode, python-jose, passlib, google-generativeai, psycopg2-binary, etc.)
+
+**Known Non-Critical:**
+- `google.generativeai` deprecation warning (non-blocking; upgrade to `google.genai` can be deferred)
+
+**Cost Impact:**
+- Before: 2 Cloud Run services + 2 Cloud Storage buckets + 2 Firestore instances (separate billing)
+- After: 1 Cloud Run service + 1 Cloud Storage bucket + 1 Firestore instance (consolidated billing)
+
+### What was just completed (Phase P3.5 — Monorepo Consolidation) ✅
 
 ### What was just completed (Phase P2.5 — Offline Meal Storage) ✅
 Implemented comprehensive offline meal storage system with editing capabilities.
@@ -478,6 +577,25 @@ A milestone is “done” only when:
 
 ## 15) Quick start commands
 
+### Full Stack (Backend + Frontend Together)
+**Option A: VS Code Debug Mode (Recommended)**
+1. Open `.vscode/launch.json` (runs both services in split terminals)
+2. Go to **Debug** → **"Full Stack: Unified Backend + Frontend"**
+3. Press **F5** or **Run** button
+4. Backend runs on `http://localhost:8000`
+5. Frontend runs on `http://localhost:5173`
+
+**Option B: Manual Terminals**
+```powershell
+# Terminal 1: Backend
+cd backend
+..\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+
+# Terminal 2: Frontend
+cd frontend
+npm run dev
+```
+
 ### Flutter (Windows)
 ```bash
 flutter doctor
@@ -486,13 +604,20 @@ flutter pub get
 flutter run
 ```
 
-### Backend (Python)
+### Backend only (Python)
 ```bash
 cd backend
 python -m venv .venv
 .\.venv\Scripts\activate
 pip install -r requirements.txt
 uvicorn app.main:app --reload
+```
+
+### Frontend only (Node)
+```bash
+cd frontend
+npm install
+npm run dev
 ```
 
 ---

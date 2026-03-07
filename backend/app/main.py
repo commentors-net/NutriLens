@@ -56,15 +56,37 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS middleware for development
-cors_origins = os.getenv("CORS_ORIGINS", "*").split(",")
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=cors_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# CORS middleware for development and production.
+# If CORS_ORIGINS is "*", credentials must be disabled to keep browsers happy.
+_default_dev_origins = [
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5174",
+]
+_raw_cors = os.getenv("CORS_ORIGINS", "")
+_env_origins = [o.strip() for o in _raw_cors.split(",") if o.strip()]
+
+if "*" in _env_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=False,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    logger.info("CORS configured with wildcard origin and credentials disabled")
+else:
+    # Keep env-provided origins, but always include local dev ports.
+    cors_origins = list(dict.fromkeys(_default_dev_origins + _env_origins))
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    logger.info(f"CORS configured for origins: {cors_origins}")
 
 # NutriLens routes (legacy + namespaced)
 app.include_router(meals_router, prefix="/meals", tags=["meals"])
