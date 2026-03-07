@@ -3,6 +3,7 @@ import '../features/capture/capture_screen.dart';
 import '../features/capture/review_screen.dart';
 import '../features/results/results_screen.dart';
 import '../features/home/home_screen.dart';
+import '../features/meals/saved_meals_screen.dart';
 
 /// Named route constants — use these instead of raw strings
 class AppRoutes {
@@ -10,6 +11,7 @@ class AppRoutes {
   static const capture = '/capture';
   static const review = '/review';
   static const results = '/results';
+  static const savedMeals = '/saved-meals';
 }
 
 final appRouter = GoRouter(
@@ -30,6 +32,10 @@ final appRouter = GoRouter(
     GoRoute(
       path: AppRoutes.results,
       builder: (context, state) => const ResultsScreen(),
+    ),
+    GoRoute(
+      path: AppRoutes.savedMeals,
+      builder: (context, state) => const SavedMealsScreen(),
     ),
   ],
 );

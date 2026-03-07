@@ -46,6 +46,13 @@ class HomeScreen extends ConsumerWidget {
 
             const Spacer(),
 
+            OutlinedButton.icon(
+              onPressed: () => context.push(AppRoutes.savedMeals),
+              icon: const Icon(Icons.bookmark_outline),
+              label: const Text('Saved Meals'),
+            ),
+            const SizedBox(height: 12),
+
             FilledButton.icon(
               onPressed: () => context.push(AppRoutes.capture),
               icon: const Icon(Icons.camera_alt),

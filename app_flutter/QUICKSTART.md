@@ -42,9 +42,16 @@ pip install -r requirements.txt
 ### Android
 ```bash
 cd app_flutter
-flutter run -d emulator
+flutter run
 # or specify device: flutter devices, then flutter run -d <device_id>
 ```
+
+### Offline Mode (New!)
+The app now supports offline meal storage:
+- **Save for Later**: Take photos and save meals when offline
+- **Analyze Later**: Trigger analysis when you have internet
+- **Edit Anytime**: Rename meals and edit detected items
+- Access saved meals from home screen → "Saved Meals" button
 
 ### iOS (macOS only)
 ```bash

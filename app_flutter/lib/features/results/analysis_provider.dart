@@ -1,7 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 import '../../core/api/food_vision_client.dart';
 import '../../core/api/api_config.dart';
 import '../../core/models/analyze_response.dart';
+import '../../core/models/meal_draft.dart';
+import '../meals/meals_provider.dart';
 
 final _client = FoodVisionClient(baseUrl: kBackendBaseUrl);
 
@@ -39,14 +42,42 @@ final analysisProvider =
 
 // ─── Save meal provider ───────────────────────────────────────────────────────
 
-/// Tracks the state of saving a meal to the backend after the user confirms.
+/// Tracks the state of saving a meal to the backend + local DB after the user confirms.
 class SaveMealNotifier extends StateNotifier<AsyncValue<String?>> {
-  SaveMealNotifier() : super(const AsyncValue.data(null));
+  final Ref _ref;
+
+  SaveMealNotifier(this._ref) : super(const AsyncValue.data(null));
 
   Future<void> save(AnalyzeMealResponse analysis) async {
     state = const AsyncValue.loading();
     try {
+      // Save to backend
       final mealId = await _client.saveMealFromAnalysis(analysis);
+      
+      // Also save to local database
+      final savedMeal = SavedMeal(
+        id: mealId ?? const Uuid().v4(),
+        name: 'Meal ${DateTime.now().toString().substring(5, 16)}',
+        analyzedAt: DateTime.now(),
+        items: analysis.items.map((item) => MealItem.fromJson({
+          'item_id': item.itemId,
+          'label': item.label,
+          'grams_estimate': item.gramsEstimate,
+          'macros': {
+            'kcal': item.macros.kcal,
+            'protein_g': item.macros.proteinG,
+            'carbs_g': item.macros.carbsG,
+            'fat_g': item.macros.fatG,
+          },
+        })).toList(),
+        totalKcal: analysis.items.fold<double>(0, (sum, i) => sum + i.macros.kcal.toDouble()),
+        totalProteinG: analysis.items.fold<double>(0, (sum, i) => sum + i.macros.proteinG),
+        totalCarbsG: analysis.items.fold<double>(0, (sum, i) => sum + i.macros.carbsG),
+        totalFatG: analysis.items.fold<double>(0, (sum, i) => sum + i.macros.fatG),
+      );
+      
+      await _ref.read(savedMealsControllerProvider.notifier).saveMeal(savedMeal);
+      
       state = AsyncValue.data(mealId);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -58,6 +89,6 @@ class SaveMealNotifier extends StateNotifier<AsyncValue<String?>> {
 
 final saveMealProvider =
     StateNotifierProvider<SaveMealNotifier, AsyncValue<String?>>(
-  (ref) => SaveMealNotifier(),
+  (ref) => SaveMealNotifier(ref),
 );
 

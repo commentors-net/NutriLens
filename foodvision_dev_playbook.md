@@ -4,6 +4,34 @@
 
 ## ▶ RESUME HERE — Last session: 2026-02-28
 ## ▶ RESUME HERE — Last session: 2026-03-06
+## ▶ RESUME HERE — Last session: 2026-03-07
+
+### What was just completed (Phase P2.5 — Offline Meal Storage) ✅
+Implemented comprehensive offline meal storage system with editing capabilities.
+
+### Phase P2.5 — Offline Meal Storage (COMPLETED ✅)
+
+| File | Status |
+|------|--------|
+| `lib/core/models/meal_draft.dart` | ✅ Created — MealDraft, MealItem, SavedMeal models with JSON serialization |
+| `lib/core/storage/meal_draft_db.dart` | ✅ Created — SQLite database with meal_drafts & saved_meals tables |
+| `lib/features/meals/meals_provider.dart` | ✅ Created — Riverpod providers & controllers for CRUD operations |
+| `lib/features/meals/saved_meals_screen.dart` | ✅ Created — Two-tab UI (Drafts/Analyzed) with rename/delete |
+| `lib/features/meals/meal_detail_screen.dart` | ✅ Created — Detail view with analyze button & item editing |
+| `lib/features/capture/review_screen.dart` | ✅ Updated — Added "Save for Later" button with 2s toast duration |
+| `lib/features/results/analysis_provider.dart` | ✅ Updated — Dual-save to backend API + local SQLite |
+| `lib/features/home/home_screen.dart` | ✅ Updated — Added "Saved Meals" button |
+| `lib/app/router.dart` | ✅ Updated — Added `/saved-meals` route |
+| `pubspec.yaml` | ✅ Updated — Added uuid: ^4.0.0 dependency |
+
+**Features implemented:**
+- Save meals offline with custom names before analysis
+- View saved drafts and analyzed meals in separate tabs
+- Analyze drafts when online (opens detail → tap Analyze)
+- Edit meal names anytime (both drafts & analyzed)
+- Edit meal items (labels, grams, delete items with auto-recalc)
+- Dual persistence: backend API + local SQLite
+- Toast notifications with 2-second auto-dismiss
 
 ### What was just completed (Phase P2 — Backend Development + Cloud Run Deployment) ✅
 All code written, tested (pytest 8/8), and DEPLOYED to Cloud Run.
@@ -34,8 +62,23 @@ All code written, tested (pytest 8/8), and DEPLOYED to Cloud Run.
 
 ### Next steps (Phase P3 & P4)
 
+#### Phase P3 — App Select Page (COMPLETED ✅)
+Created unified app selector in Leave Tracker React frontend:
+
+| File | Status |
+|------|--------|
+| `frontend/src/pages/AppSelect.tsx` | ✅ Created — Material Design cards for both apps |
+| `frontend/src/App.tsx` | ✅ Updated — Added AppSelect route, navigation, and "Apps" menu item |
+
+**Features implemented:**
+- Landing page at "/" with app picker cards
+- Leave Tracker card navigates to /login
+- NutriLens card shows download info (placeholder for future APK distribution)
+- "Apps" navigation link in header for easy return to app selector
+- Responsive design with hover effects
+- Integrated with existing authentication flow
+
 #### Ready to implement NOW:
-- **Phase P3:** Add `/app-select` page to the existing Leave Tracker React frontend; app-picker cards for NutriLens + Leave Tracker
 - **Phase P4:** Google SSO via Firebase Authentication (free tier); add to both apps
 
 #### Notes for future sessions:

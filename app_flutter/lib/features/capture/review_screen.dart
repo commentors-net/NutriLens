@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'capture_controller.dart';
 import '../../app/router.dart';
 import '../results/analysis_provider.dart';
+import '../meals/meals_provider.dart';
 
 /// Review screen for viewing and managing captured photos before analysis
 class ReviewScreen extends ConsumerWidget {
@@ -216,40 +217,125 @@ class ReviewScreen extends ConsumerWidget {
           ),
         ],
       ),
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // Add more photos button
-          if (!captureState.hasMaxPhotos)
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: () => context.pop(),
-                icon: const Icon(Icons.add_a_photo),
-                label: const Text('Add More'),
-              ),
-            ),
-
-          if (!captureState.hasMaxPhotos && captureState.hasMinPhotos)
-            const SizedBox(width: 12),
-
-          // Analyze button
+          // Save for Later button (if has min photos)
           if (captureState.hasMinPhotos)
-            Expanded(
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  ref.read(analysisProvider.notifier).analyze(captureState.photoPaths);
-                  context.go(AppRoutes.results);
-                },
-                icon: const Icon(Icons.analytics),
-                label: const Text('Analyze Meal'),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => _saveForLater(context, ref, captureState),
+                icon: const Icon(Icons.bookmark_outline),
+                label: const Text('Save for Later'),
               ),
             ),
+          
+          if (captureState.hasMinPhotos)
+            const SizedBox(height: 12),
+
+          Row(
+            children: [
+              // Add more photos button
+              if (!captureState.hasMaxPhotos)
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => context.pop(),
+                    icon: const Icon(Icons.add_a_photo),
+                    label: const Text('Add More'),
+                  ),
+                ),
+
+              if (!captureState.hasMaxPhotos && captureState.hasMinPhotos)
+                const SizedBox(width: 12),
+
+              // Analyze button
+              if (captureState.hasMinPhotos)
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: () {
+                      ref.read(analysisProvider.notifier).analyze(captureState.photoPaths);
+                      context.go(AppRoutes.results);
+                    },
+                    icon: const Icon(Icons.analytics),
+                    label: const Text('Analyze Now'),
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ],
       ),
       ),
     );
+  }
+
+  Future<void> _saveForLater(BuildContext context, WidgetRef ref, captureState) async {
+    final controller = TextEditingController(text: 'Meal ${DateTime.now().toString().substring(5, 16)}');
+    
+    final name = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Save Meal'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            labelText: 'Meal Name',
+            hintText: 'e.g., Lunch, Dinner',
+          ),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+
+    if (name == null || name.isEmpty) return;
+
+    try {
+      await ref.read(mealDraftsControllerProvider.notifier).saveDraft(
+        name: name,
+        photoPaths: captureState.photoPaths,
+      );
+
+      if (context.mounted) {
+        // Clear capture state and go home
+        ref.read(captureProvider.notifier).clear();
+        context.go(AppRoutes.home);
+        
+        // Show snackbar after navigation
+        Future.delayed(const Duration(milliseconds: 100), () {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Saved "$name" for later'),
+                duration: const Duration(seconds: 2),
+                action: SnackBarAction(
+                  label: 'View',
+                  onPressed: () => context.push(AppRoutes.savedMeals),
+                ),
+              ),
+            );
+          }
+        });
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to save: $e')),
+        );
+      }
+    }
   }
 
   void _confirmDelete(BuildContext context, WidgetRef ref, int index) {
