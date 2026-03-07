@@ -6,7 +6,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from app.db.models import Base
 
-DATABASE_URL = "sqlite:///./nutrition.db"
+# Keep SQLAlchemy dev path aligned with unified local SQLite file.
+DATABASE_URL = "sqlite:///./unified_dev.db"
 
 engine = create_engine(
     DATABASE_URL,

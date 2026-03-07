@@ -21,7 +21,7 @@ from typing import Any, Dict, List, Optional
 
 class NutriLensSQLiteDB:
     def __init__(self) -> None:
-        self.db_path = os.getenv("DATABASE_URL", "nutrition_cloud.db").replace(
+        self.db_path = os.getenv("DATABASE_URL", "sqlite:///./unified_dev.db").replace(
             "sqlite:///./", ""
         )
         self._create_tables()

@@ -6,6 +6,7 @@
 ## ▶ RESUME HERE — Last session: 2026-03-06
 ## ▶ RESUME HERE — Last session: 2026-03-07 (Morning)
 ## ▶ RESUME HERE — Last session: 2026-03-07 (Evening) — End-to-End Validation Complete ✅
+## ▶ RESUME HERE — Last session: 2026-03-07 (Late Evening) — Shared SQLite Unified ✅
 
 **STATUS AT SESSION END (2026-03-07 Evening):**
 Phase P3.5 (Unified Monorepo + Single Backend Runtime) is **COMPLETE and VALIDATED**.
@@ -25,6 +26,7 @@ Phase P3.5 (Unified Monorepo + Single Backend Runtime) is **COMPLETE and VALIDAT
 ✅ Protected endpoints enforce authentication: GET `/leave-tracker/api/people` → 403 without token ✓
 ✅ Frontend loads at http://localhost:5174 (port adjusted from 5173 due to availability)
 ✅ VS Code launch.json configured for full-stack startup
+✅ Local dev DB unified: Leave Tracker + NutriLens now share `backend/app/unified_dev.db`
 
 ---
 
@@ -45,6 +47,12 @@ Phase P3.5 (Unified Monorepo + Single Backend Runtime) is **COMPLETE and VALIDAT
 1. Ensure backend running: `cd backend; ..\.venv\Scripts\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8000`
 2. Update `app_flutter/lib/core/api/api_config.dart` to point to PC local IP (if not already)
 3. Run: `cd app_flutter; flutter run -d <device-id>`
+
+### Option 4: Local Shared Database (new)
+1. In development mode, both systems write to one SQLite file: `backend/app/unified_dev.db`
+2. Leave Tracker tables: `users`, `people`, `types`, `absences`, `ai_instructions`
+3. NutriLens tables: `foods`, `meals` (+ SQLAlchemy `meal_items` if used)
+4. Optional override for both systems: set `DATABASE_URL=sqlite:///./unified_dev.db`
 
 ---
 

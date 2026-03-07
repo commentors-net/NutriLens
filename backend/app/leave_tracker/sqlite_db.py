@@ -9,13 +9,21 @@ class SQLiteDB:
     """SQLite database helper class with Firestore-compatible interface"""
     
     def __init__(self, db_path: str = None):
-        # Use absolute path to avoid working directory issues
+        # Use absolute path to avoid working directory issues.
+        # In unified monorepo dev mode, default to one shared SQLite file.
         if db_path is None:
-            # Get the directory where this file is located
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            # Go up one level to backend directory
-            backend_dir = os.path.dirname(current_dir)
-            db_path = os.path.join(backend_dir, "database.db")
+            database_url = os.getenv("DATABASE_URL", "").strip()
+            if database_url.startswith("sqlite:///"):
+                db_path = database_url.replace("sqlite:///", "")
+            elif database_url:
+                db_path = database_url
+            else:
+                # Get the directory where this file is located
+                current_dir = os.path.dirname(os.path.abspath(__file__))
+                # Go up one level to backend/app directory
+                app_dir = os.path.dirname(current_dir)
+                # Shared dev DB for both NutriLens + Leave Tracker
+                db_path = os.path.join(app_dir, "unified_dev.db")
         
         self.db_path = db_path
         self._create_tables()
