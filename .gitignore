@@ -149,6 +149,15 @@ backend/alembic.ini
 backend/uploads/
 backend/logs/
 backend/*.log
+backend/.env.leave-tracker
+backend/firestore-key.json
+backend/database.db
+backend/data_export.json
+backend/id_mapping.json
+backend/local_dev_data.json
+backend/venv/
+frontend/.env.development
+frontend/.env.production
 
 # OS specific
 Thumbs.db

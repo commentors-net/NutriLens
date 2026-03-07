@@ -33,14 +33,19 @@ NutriLens/
 │   ├── QUICKSTART.md     # Quick start guide
 │   └── CONFIG_SYNC.md    # Version management guide
 │
-├── backend/              # FastAPI backend service
+├── backend/              # Unified FastAPI backend workspace
 │   ├── app/             # Python source code
-│   │   ├── api/         # REST API routes
-│   │   ├── models/      # Pydantic schemas
-│   │   ├── services/    # Business logic (analysis, nutrition)
-│   │   └── db/          # Database models
+│   │   ├── api/         # NutriLens REST routes
+│   │   ├── db/          # NutriLens database layer
+│   │   ├── leave_tracker/ # Leave Tracker API package
+│   │   ├── models/      # NutriLens schemas/models
+│   │   └── services/    # NutriLens business logic
 │   ├── tests/           # Backend tests (pytest)
 │   └── .env.example     # Environment variables template
+│
+├── frontend/             # Leave Tracker React web frontend
+│   ├── src/
+│   └── package.json
 │
 ├── shared/              # Shared resources
 │   ├── schemas/         # JSON schemas (source of truth)
@@ -82,6 +87,22 @@ uvicorn app.main:app --reload
 **3. API Documentation**
 - Health: http://localhost:8000/health
 - Swagger: http://localhost:8000/docs
+
+### GCP Deploy From This Root Folder
+
+Run these from `D:\Jobs\workspace\NutriLens`:
+
+```powershell
+# NutriLens backend
+.\deploy-nutrilens-backend.ps1
+
+# Leave Tracker backend/frontend (from unified root paths)
+.\deploy-leave-tracker-backend.ps1
+.\deploy-leave-tracker-frontend.ps1
+
+# Leave Tracker full deploy (requires params)
+.\deploy-leave-tracker-complete.ps1 -ProjectId <gcp-project> -SecretKey <secret> -GeminiApiKey <gemini-key>
+```
 
 See [app_flutter/QUICKSTART.md](app_flutter/QUICKSTART.md) for detailed setup instructions.
 

@@ -1,0 +1,11 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -f
+      - backend/Dockerfile.leave-tracker
+      - -t
+      - $_IMAGE_TAG
+      - backend
+images:
+  - $_IMAGE_TAG

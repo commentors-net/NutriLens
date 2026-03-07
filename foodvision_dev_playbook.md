@@ -6,6 +6,23 @@
 ## ▶ RESUME HERE — Last session: 2026-03-06
 ## ▶ RESUME HERE — Last session: 2026-03-07
 
+### What was just completed (Phase P3.5 — Monorepo Consolidation) ✅
+Leave Tracker was merged into shared root folders so both products are managed from one `backend/` and one `frontend/`.
+
+| File | Status |
+|------|--------|
+| `backend/app/leave_tracker/**` | ✅ Leave Tracker backend merged under shared backend app folder |
+| `frontend/**` | ✅ Leave Tracker React frontend moved to root frontend folder |
+| `deploy-leave-tracker-backend.ps1` | ✅ Updated — deploys Leave Tracker from unified backend |
+| `deploy-leave-tracker-frontend.ps1` | ✅ Updated — deploys from root frontend folder |
+| `deploy-leave-tracker-complete.ps1` | ✅ Updated — full deploy using unified structure |
+
+**Root deploy commands now available:**
+- `./deploy-nutrilens-backend.ps1`
+- `./deploy-leave-tracker-backend.ps1`
+- `./deploy-leave-tracker-frontend.ps1`
+- `./deploy-leave-tracker-complete.ps1 -ProjectId <id> -SecretKey <secret> -GeminiApiKey <key>`
+
 ### What was just completed (Phase P2.5 — Offline Meal Storage) ✅
 Implemented comprehensive offline meal storage system with editing capabilities.
 
@@ -1039,7 +1056,7 @@ See [CONFIG_SYNC.md](app_flutter/CONFIG_SYNC.md) for complete guide.
 
 ### 19.1) Leave Tracker — Existing System (as-built, verified Feb 2026)
 
-**Location:** `D:\Jobs\workspace\python-projects\Leave-tracker-app`
+**Previous external location (before consolidation):** `D:\Jobs\workspace\python-projects\Leave-tracker-app`
 
 #### Infrastructure (confirmed from deploy scripts)
 | Component | Technology | Hosting |
@@ -1179,9 +1196,9 @@ Google Cloud (same project as Leave Tracker)
 - [ ] Update Flutter `api_config.dart` → Cloud Run URL
 
 #### Phase P3 — Shared Frontend: App Selector
-- [ ] Add `/app-select` route to existing React frontend
-- [ ] Post-login: if user has access to multiple apps → show app picker
-- [ ] App picker cards: 🥗 NutriLens | 🌿 Leave Tracker
+- [x] Add `/app-select` route to existing React frontend
+- [ ] Post-login: if user has access to multiple apps → show app picker (role-based access still pending)
+- [x] App picker cards: 🥗 NutriLens | 🌿 Leave Tracker
 - [ ] If user has access to one app only → redirect directly (no picker shown)
 - [ ] User-app access stored in Firestore `user_apps/{userId}` document
 - [ ] NutriLens admin pages stub (`/nutrilens/dashboard`)
@@ -1236,12 +1253,13 @@ Cloud Run expects port 8080 by default (Leave Tracker uses the same).
 ### 19.6) Unified Monorepo Structure (Phase P2+)
 
 ```
-D:\Jobs\workspace\NutriLens\           ← NutriLens monorepo (current)
-D:\Jobs\workspace\python-projects\
-  Leave-tracker-app\                   ← Leave Tracker (separate repo, stays separate)
+D:\Jobs\workspace\NutriLens\           ← Unified monorepo (single deployment workspace)
+  app_flutter\                           ← NutriLens mobile app
+  backend\                               ← Shared backend (NutriLens + Leave Tracker package)
+  frontend\                              ← Leave Tracker web frontend
 ```
 
-**Decision: Keep repos separate.** Merging into one monorepo adds complexity with no benefit — both apps deploy independently on Cloud Run. The shared element is only the **frontend React app** (extended, not merged).
+**Decision: Consolidate into one repo.** Both apps are now maintained under `NutriLens` so deployment to GCP can be run from a single root folder. Original external Leave Tracker repo can be retired after verification.
 
 ---
 
@@ -1260,10 +1278,17 @@ D:\Jobs\workspace\python-projects\
 ## Appendix: Decisions log
 Record decisions here as you go (date + why).
 
+- 2026-03-07: **Monorepo consolidation decision updated** — Leave Tracker merged into root `backend/` and `frontend/` folders.
+  - Deployment goal: run all GCP deploy operations from `D:\Jobs\workspace\NutriLens`.
+  - Leave Tracker backend package moved to `backend/app/leave_tracker`.
+  - Leave Tracker web frontend moved to `frontend/`.
+  - Root-level deployment scripts now target unified paths directly.
+  - External repo cleanup/deletion deferred until post-migration validation.
+
 - 2026-02-28: **Platform unification decision** — NutriLens backend will deploy to Google Cloud alongside the existing Leave Tracker, sharing the same GCP project.
   - Leave Tracker confirmed on **Cloud Run** (not App Engine as initially assumed) — service `leave-tracker-api`; frontend on Cloud Storage static bucket.
   - Both apps use the same tech stack (FastAPI + React + TypeScript + Firestore), so integration cost is low.
-  - **Repos stay separate** — Leave Tracker remains in its own repo; NutriLens merges nothing. Only the React frontend is extended with an app-selector and NutriLens admin pages.
+  - Initial assumption (superseded 2026-03-07): repos stay separate.
   - **Google SSO** added via Firebase Authentication (free tier, ≤10K MAU) — existing email/password + 2FA path preserved untouched.
   - NutriLens mobile (Flutter) talks only to `nutrilens-api` Cloud Run service; no dependency on Leave Tracker.
   - Additional monthly cost estimated $0–$5 for NutriLens Cloud Run service (within free tier for dev/test traffic).
