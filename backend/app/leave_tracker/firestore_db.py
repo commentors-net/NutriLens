@@ -14,6 +14,7 @@ class FirestoreDB:
         
         # Collection names
         self.USERS = "users"
+        self.USER_APPS = "user_apps"
         self.AI_INSTRUCTIONS = "ai_instructions"
         self.ABSENCES = "absences"
         self.PEOPLE = "people"
@@ -47,11 +48,50 @@ class FirestoreDB:
         if user.exists:
             return {"id": user.id, **user.to_dict()}
         return None
+
+    def get_all_users(self) -> List[Dict[str, Any]]:
+        """Get all users."""
+        users = self.db.collection(self.USERS).order_by("username").stream()
+        return [{"id": user.id, **user.to_dict()} for user in users]
     
     def update_user_password(self, user_id: str, new_password: str):
         """Update user password"""
         user_ref = self.db.collection(self.USERS).document(user_id)
         user_ref.update({"password": new_password})
+
+    def update_user_admin_status(self, user_id: str, is_admin: bool) -> Dict[str, Any]:
+        """Update user admin status"""
+        user_ref = self.db.collection(self.USERS).document(user_id)
+        user_ref.update({"is_admin": is_admin})
+        # Return updated user
+        user = user_ref.get()
+        if user.exists:
+            return {"id": user.id, **user.to_dict()}
+        return {}
+
+    def set_user_system_access(self, user_id: str, systems: List[str]) -> Dict[str, Any]:
+        """Upsert allowed systems for a user."""
+        systems_sorted = sorted(set(systems))
+        payload = {
+            "systems": systems_sorted,
+            "updated_at": datetime.now().isoformat(),
+        }
+        self.db.collection(self.USER_APPS).document(user_id).set(payload)
+        return payload
+
+    def get_user_system_access(self, user_id: str) -> List[str]:
+        """Get allowed systems for a user. Defaults to both systems if not configured."""
+        access_doc = self.db.collection(self.USER_APPS).document(user_id).get()
+        if access_doc.exists:
+            data = access_doc.to_dict() or {}
+            systems = data.get("systems") or []
+            if systems:
+                return sorted(set(systems))
+
+        # Backward-compatible default for existing users.
+        default_systems = ["leave-tracker", "nutrilens"]
+        self.set_user_system_access(user_id, default_systems)
+        return default_systems
     
     # ==================== AI INSTRUCTIONS ====================
     

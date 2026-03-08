@@ -1,7 +1,9 @@
 import { Container, Box, Typography, Card, CardContent, CardActionArea, Grid } from '@mui/material';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import RestaurantIcon from '@mui/icons-material/Restaurant';
+import { authApi } from '@services/api';
 
 function AppSelect() {
   const navigate = useNavigate();
@@ -11,19 +13,63 @@ function AppSelect() {
       name: 'Leave Tracker',
       description: 'Manage employee leave requests and track absences',
       icon: <CalendarMonthIcon sx={{ fontSize: 80, color: 'primary.main' }} />,
-      path: '/leave-tracker/login',
+      system: 'leave-tracker',
+      path: '/dashboard',
       color: '#1976d2', // MUI primary blue
     },
     {
       name: 'NutriLens',
       description: 'AI-powered food photo logging and nutrition tracking',
       icon: <RestaurantIcon sx={{ fontSize: 80, color: 'success.main' }} />,
-      path: '/nutrilens/login',
+      system: 'nutrilens',
+      path: '/nutrilens',
       color: '#2e7d32', // MUI success green
     },
   ];
 
+  const token = localStorage.getItem('access_token');
+  const [allowedSystems, setAllowedSystems] = useState<string[]>(() => {
+    const storedSystems = localStorage.getItem('allowed_systems');
+    return storedSystems ? JSON.parse(storedSystems) : [];
+  });
+
+  const allowedApps = useMemo(
+    () => apps.filter((app) => allowedSystems.includes(app.system)),
+    [allowedSystems],
+  );
+
+  useEffect(() => {
+    if (!token) {
+      navigate('/login', { replace: true });
+      return;
+    }
+
+    // Refresh from backend in case access changes server-side.
+    authApi
+      .me()
+      .then((profile) => {
+        const systems = profile.allowed_systems || [];
+        localStorage.setItem('allowed_systems', JSON.stringify(systems));
+        setAllowedSystems(systems);
+      })
+      .catch(() => {
+        // Keep current local access list on transient errors.
+      });
+  }, [navigate, token]);
+
+  useEffect(() => {
+    if (!token) {
+      return;
+    }
+    if (allowedApps.length === 1) {
+      localStorage.setItem('selected_system', allowedApps[0].system);
+      navigate(allowedApps[0].path, { replace: true });
+    }
+  }, [allowedApps, navigate, token]);
+
   const handleAppClick = (app: typeof apps[0]) => {
+    localStorage.setItem('selected_system', app.system);
+    window.dispatchEvent(new Event('storage'));
     navigate(app.path);
   };
 
@@ -43,11 +89,11 @@ function AppSelect() {
           Welcome
         </Typography>
         <Typography variant="h6" color="text.secondary" align="center" sx={{ mb: 6 }}>
-          Choose an app to get started
+          Choose a system you can access
         </Typography>
 
         <Grid container spacing={4} justifyContent="center" maxWidth="900px">
-          {apps.map((app) => (
+          {allowedApps.map((app) => (
             <Grid size={{ xs: 12, sm: 6, md: 5 }} key={app.name}>
               <Card
                 elevation={3}
@@ -98,6 +144,12 @@ function AppSelect() {
             </Grid>
           ))}
         </Grid>
+
+        {allowedApps.length === 0 && (
+          <Typography variant="body1" color="error" sx={{ mt: 2 }}>
+            No systems are enabled for your account. Please contact an administrator.
+          </Typography>
+        )}
 
         <Typography variant="body2" color="text.secondary" align="center" sx={{ mt: 6 }}>
           Part of the unified productivity platform

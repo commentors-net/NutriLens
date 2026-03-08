@@ -1330,25 +1330,25 @@ Google Cloud (same project as Leave Tracker)
 
 #### Phase P3 — Shared Frontend: App Selector
 - [x] Add `/app-select` route to existing React frontend
-- [ ] Post-login: if user has access to multiple apps → show app picker (role-based access still pending)
+- [x] Post-login: if user has access to multiple apps → show app picker
 - [x] App picker cards: 🥗 NutriLens | 🌿 Leave Tracker
-- [ ] If user has access to one app only → redirect directly (no picker shown)
-- [ ] User-app access stored in Firestore `user_apps/{userId}` document
+- [x] If user has access to one app only → redirect directly (no picker shown)
+- [x] User-app access stored in Firestore `user_apps/{userId}` document
 - [ ] NutriLens admin pages stub (`/nutrilens/dashboard`)
 
 #### Phase P4 — Google SSO (free via Firebase Auth)
 - [ ] Enable Firebase Authentication in the existing GCP project (free tier)
-- [ ] Add `firebase-admin` to Leave Tracker backend requirements
-- [ ] Add Google Sign-In button to `Login.tsx`
-- [ ] On Google SSO success: create/link user in Firestore `users/` collection
-- [ ] Issue same JWT token as email/password login (transparent to rest of app)
-- [ ] Keep existing email/password + 2FA path 100% working
+- [x] Add backend Google ID token verification dependency (`google-auth`)
+- [x] Add Google Sign-In button to `Login.tsx`
+- [x] On Google SSO success: create/link user in Firestore `users/` collection
+- [x] Issue same JWT token as email/password login (transparent to rest of app)
+- [x] Keep existing email/password + 2FA path 100% working
 - [ ] Firebase Auth free tier: up to 10,000 users/month — **no cost**
 
 #### Phase P5 — NutriLens Admin UI
 - [ ] `/nutrilens/meals` — meal log viewer (date, items, macros)
 - [ ] `/nutrilens/nutrition` — food DB browser/editor
-- [ ] `/nutrilens/users` — which users have access (admin only)
+- [x] `/nutrilens/users` — which users have access (admin only via `ADMIN_USERS` when configured)
 - [ ] Chart: daily kcal trend (recharts or MUI charts)
 
 ---
@@ -1410,6 +1410,23 @@ D:\Jobs\workspace\NutriLens\           ← Unified monorepo (single deployment w
 
 ## Appendix: Decisions log
 Record decisions here as you go (date + why).
+
+- 2026-03-08: **Login-first system selection implemented with per-user access mapping**.
+  - Frontend login now stores `allowed_systems` and always routes to `/app-select` before entering either app.
+  - App selector only shows systems enabled for that user; if only one system is enabled it auto-redirects.
+  - Leave Tracker DB adapters now persist user app access:
+    - SQLite: `user_apps` table with `leave_tracker_access` + `nutrilens_access`.
+    - Firestore: `user_apps/{userId}` document with `systems: []`.
+  - Auth responses now include `allowed_systems` + `default_system`.
+  - Added `POST /auth/google-login` and `GET /auth/me` (plus namespaced aliases) for Google sign-in and access-aware profile bootstrap.
+
+- 2026-03-08: **User access admin API + UI added**.
+  - Backend endpoints:
+    - `GET /auth/user-access` list all users with `allowed_systems`.
+    - `PUT /auth/user-access/{username}` update systems (`leave-tracker`, `nutrilens`).
+    - Available on namespaced auth aliases too (`/nutrilens/auth/*`, `/leave-tracker/auth/*`).
+  - Frontend page: `/nutrilens/users` with per-user toggles for both systems.
+  - Authorization: if `ADMIN_USERS` env var is set (comma-separated usernames), only those users can manage access.
 
 - 2026-03-07: **Monorepo consolidation decision updated** — Leave Tracker merged into root `backend/` and `frontend/` folders.
   - Deployment goal: run all GCP deploy operations from `D:\Jobs\workspace\NutriLens`.

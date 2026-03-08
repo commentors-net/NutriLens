@@ -17,3 +17,4 @@ qrcode
 python-jose[cryptography]
 passlib[bcrypt]
 google-generativeai
+google-auth

@@ -18,16 +18,53 @@ class Token(BaseModel):
     access_token: str
     token_type: str
 
+
+class LoginResponse(Token):
+    username: str
+    allowed_systems: list[str]
+    default_system: str
+
 class TokenData(BaseModel):
     username: str
     password: str
     token: str
+
+
+class GoogleLoginRequest(BaseModel):
+    id_token: str
 
 class RegisterResponse(BaseModel):
     qr: str
     secret: str
     username: str
     id: str
+
+
+class UserSystemsResponse(BaseModel):
+    username: str
+    allowed_systems: list[str]
+    default_system: str
+
+
+class UserAccessItem(BaseModel):
+    user_id: str
+    username: str
+    allowed_systems: list[str]
+
+
+class UserAccessUpdate(BaseModel):
+    allowed_systems: list[str]
+
+
+class UserAdminUpdate(BaseModel):
+    is_admin: bool
+
+
+class UserDetailResponse(BaseModel):
+    user_id: str
+    username: str
+    allowed_systems: list[str]
+    is_admin: bool
 
 class PasswordChange(BaseModel):
     username: str

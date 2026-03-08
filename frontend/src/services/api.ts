@@ -32,6 +32,8 @@ apiClient.interceptors.response.use(
       // Token expired or invalid, clear storage and redirect to login
       localStorage.removeItem("access_token");
       localStorage.removeItem("username");
+      localStorage.removeItem("allowed_systems");
+      localStorage.removeItem("selected_system");
       window.location.href = "/login";
     }
     return Promise.reject(error);
@@ -64,6 +66,39 @@ export interface LoginResponse {
   access_token: string;
   token_type: string;
   username: string;
+  allowed_systems: string[];
+  default_system: string;
+}
+
+export interface GoogleLoginRequest {
+  id_token: string;
+}
+
+export interface UserSystemsResponse {
+  username: string;
+  allowed_systems: string[];
+  default_system: string;
+}
+
+export interface UserAccessItem {
+  user_id: string;
+  username: string;
+  allowed_systems: string[];
+}
+
+export interface UserAccessUpdate {
+  allowed_systems: string[];
+}
+
+export interface UserAdminUpdate {
+  is_admin: boolean;
+}
+
+export interface UserDetailResponse {
+  user_id: string;
+  username: string;
+  allowed_systems: string[];
+  is_admin: boolean;
 }
 
 type AuthSystem = "" | "leave-tracker" | "nutrilens";
@@ -92,12 +127,56 @@ export const authApi = {
     return response.data;
   },
 
+  googleLogin: async (
+    data: GoogleLoginRequest,
+    system: AuthSystem = "",
+  ): Promise<LoginResponse> => {
+    const response = await axios.post(`${config.apiUrl}${authBasePath(system)}/google-login`, data);
+    return response.data;
+  },
+
+  me: async (system: AuthSystem = ""): Promise<UserSystemsResponse> => {
+    const response = await apiClient.get(`${authBasePath(system)}/me`);
+    return response.data;
+  },
+
+  listUserAccess: async (system: AuthSystem = ""): Promise<UserAccessItem[]> => {
+    const response = await apiClient.get(`${authBasePath(system)}/user-access`);
+    return response.data;
+  },
+
+  updateUserAccess: async (
+    username: string,
+    data: UserAccessUpdate,
+    system: AuthSystem = "",
+  ): Promise<UserAccessItem> => {
+    const response = await apiClient.put(`${authBasePath(system)}/user-access/${encodeURIComponent(username)}`, data);
+    return response.data;
+  },
+
   changePassword: async (data: {
     username: string;
     old_password: string;
     new_password: string;
   }, system: AuthSystem = ""): Promise<{ message: string }> => {
     const response = await apiClient.post(`${authBasePath(system)}/change-password`, data);
+    return response.data;
+  },
+
+  getUserDetail: async (username: string, system: AuthSystem = ""): Promise<UserDetailResponse> => {
+    const response = await apiClient.get(`${authBasePath(system)}/user/${encodeURIComponent(username)}`);
+    return response.data;
+  },
+
+  updateUserAdminStatus: async (
+    username: string,
+    data: UserAdminUpdate,
+    system: AuthSystem = "",
+  ): Promise<UserDetailResponse> => {
+    const response = await apiClient.put(
+      `${authBasePath(system)}/user/${encodeURIComponent(username)}/admin`,
+      data
+    );
     return response.data;
   },
 };

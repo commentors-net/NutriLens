@@ -45,7 +45,18 @@ class SQLiteDB:
                 id TEXT PRIMARY KEY,
                 username TEXT UNIQUE NOT NULL,
                 password TEXT NOT NULL,
-                otp_secret TEXT NOT NULL
+                otp_secret TEXT NOT NULL,
+                is_admin INTEGER NOT NULL DEFAULT 0
+            )
+        ''')
+
+        # Per-user system access table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS user_apps (
+                user_id TEXT PRIMARY KEY,
+                leave_tracker_access INTEGER NOT NULL DEFAULT 1,
+                nutrilens_access INTEGER NOT NULL DEFAULT 1,
+                FOREIGN KEY (user_id) REFERENCES users (id)
             )
         ''')
         
@@ -143,6 +154,15 @@ class SQLiteDB:
         if row:
             return dict(row)
         return None
+
+    def get_all_users(self) -> List[Dict[str, Any]]:
+        """Get all users ordered by username."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM users ORDER BY username")
+        rows = cursor.fetchall()
+        conn.close()
+        return [dict(row) for row in rows]
     
     def update_user_password(self, user_id: str, new_password: str):
         """Update user password"""
@@ -155,6 +175,69 @@ class SQLiteDB:
         )
         conn.commit()
         conn.close()
+
+    def update_user_admin_status(self, user_id: str, is_admin: bool) -> Dict[str, Any]:
+        """Update user admin status"""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute(
+            "UPDATE users SET is_admin = ? WHERE id = ?",
+            (1 if is_admin else 0, user_id)
+        )
+        conn.commit()
+        conn.close()
+        
+        # Return updated user
+        return self.get_user_by_id(user_id)
+
+    def set_user_system_access(self, user_id: str, systems: List[str]) -> Dict[str, Any]:
+        """Upsert allowed systems for a user."""
+        allow_leave_tracker = 1 if "leave-tracker" in systems else 0
+        allow_nutrilens = 1 if "nutrilens" in systems else 0
+
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            '''
+            INSERT INTO user_apps (user_id, leave_tracker_access, nutrilens_access)
+            VALUES (?, ?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET
+                leave_tracker_access = excluded.leave_tracker_access,
+                nutrilens_access = excluded.nutrilens_access
+            ''',
+            (user_id, allow_leave_tracker, allow_nutrilens),
+        )
+        conn.commit()
+        conn.close()
+
+        return {
+            "systems": self.get_user_system_access(user_id),
+        }
+
+    def get_user_system_access(self, user_id: str) -> List[str]:
+        """Get allowed systems for a user. Defaults to both systems if not configured."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT leave_tracker_access, nutrilens_access FROM user_apps WHERE user_id = ?",
+            (user_id,),
+        )
+        row = cursor.fetchone()
+        conn.close()
+
+        if row:
+            systems: List[str] = []
+            if row["leave_tracker_access"]:
+                systems.append("leave-tracker")
+            if row["nutrilens_access"]:
+                systems.append("nutrilens")
+            return systems
+
+        # Backward-compatible default for existing users.
+        default_systems = ["leave-tracker", "nutrilens"]
+        self.set_user_system_access(user_id, default_systems)
+        return default_systems
     
     # ==================== AI INSTRUCTIONS ====================
     
