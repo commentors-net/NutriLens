@@ -149,7 +149,6 @@ backend/alembic.ini
 backend/uploads/
 backend/logs/
 backend/*.log
-backend/.env.leave-tracker
 backend/firestore-key.json
 backend/database.db
 backend/data_export.json

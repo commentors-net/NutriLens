@@ -74,6 +74,19 @@ class NutriLensFirestoreDB:
         docs = self.db.collection(self.FOODS).stream()
         return sum(1 for _ in docs)
 
+    def save_food(self, food: Dict[str, Any]) -> Dict[str, Any]:
+        """Save or update a food document."""
+        food_id = food.get("food_id")
+        if not food_id:
+            raise ValueError("food_id is required")
+        
+        self.db.collection(self.FOODS).document(food_id).set(food)
+        return food
+
+    def delete_food(self, food_id: str) -> None:
+        """Delete a food document."""
+        self.db.collection(self.FOODS).document(food_id).delete()
+
     # ==================== MEALS ====================
 
     def save_meal(

@@ -22,6 +22,12 @@ export const config = {
     smartIdentificationHealth: `${API_URL}/api/smart-identify/health`,
     aiInstructions: `${API_URL}/api/ai-instructions`,
     aiInstructionsReset: `${API_URL}/api/ai-instructions/reset`,
+    meals: {
+      analyze: `${API_URL}/meals/analyze`,
+      save: `${API_URL}/meals`,
+      today: `${API_URL}/meals/today`,
+    },
+    foods: `${API_URL}/foods`,
   },
 };
 

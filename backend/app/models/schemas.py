@@ -86,3 +86,32 @@ class MealTotalResponse(BaseModel):
     total_fat_g: float
     meal_count: int
     meals: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+class Food(BaseModel):
+    """A food in the nutrition database"""
+    food_id: str
+    name: str
+    kcal_per_100g: int
+    protein_per_100g: float
+    carbs_per_100g: float
+    fat_per_100g: float
+
+
+class FoodCreate(BaseModel):
+    """Request to create a new food"""
+    name: str
+    kcal_per_100g: int
+    protein_per_100g: float
+    carbs_per_100g: float
+    fat_per_100g: float
+
+
+class FoodUpdate(BaseModel):
+    """Request to update food (partial)"""
+    name: Optional[str] = None
+    kcal_per_100g: Optional[int] = None
+    protein_per_100g: Optional[float] = None
+    carbs_per_100g: Optional[float] = None
+    fat_per_100g: Optional[float] = None
+

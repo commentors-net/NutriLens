@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from app.api.routes_meals import router as meals_router
+from app.api.routes_foods import router as foods_router
 from app.leave_tracker.api import (
     auth as lt_auth,
     people as lt_people,
@@ -91,6 +92,8 @@ else:
 # NutriLens routes (legacy + namespaced)
 app.include_router(meals_router, prefix="/meals", tags=["meals"])
 app.include_router(meals_router, prefix="/nutrilens/meals", tags=["nutrilens-meals"])
+app.include_router(foods_router, prefix="/foods", tags=["foods"])
+app.include_router(foods_router, prefix="/nutrilens/foods", tags=["nutrilens-foods"])
 
 # Leave Tracker legacy routes (kept for current web frontend compatibility)
 app.include_router(lt_auth.router, prefix="/auth", tags=["auth"])

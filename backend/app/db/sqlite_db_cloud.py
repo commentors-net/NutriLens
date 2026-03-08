@@ -118,6 +118,47 @@ class NutriLensSQLiteDB:
         conn.close()
         return count
 
+    def save_food(self, food: Dict[str, Any]) -> Dict[str, Any]:
+        """Save or update a food record."""
+        food_id = food.get("food_id")
+        if not food_id:
+            raise ValueError("food_id is required")
+        
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute(
+            """
+            INSERT INTO foods (food_id, name, kcal_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(food_id) DO UPDATE SET
+                name = excluded.name,
+                kcal_per_100g = excluded.kcal_per_100g,
+                protein_per_100g = excluded.protein_per_100g,
+                carbs_per_100g = excluded.carbs_per_100g,
+                fat_per_100g = excluded.fat_per_100g
+            """,
+            (
+                food_id,
+                food.get("name", ""),
+                food.get("kcal_per_100g", 0),
+                food.get("protein_per_100g", 0.0),
+                food.get("carbs_per_100g", 0.0),
+                food.get("fat_per_100g", 0.0),
+            ),
+        )
+        conn.commit()
+        conn.close()
+        return food
+
+    def delete_food(self, food_id: str) -> None:
+        """Delete a food record."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM foods WHERE food_id = ?", (food_id,))
+        conn.commit()
+        conn.close()
+
     # ==================== MEALS ====================
 
     def save_meal(

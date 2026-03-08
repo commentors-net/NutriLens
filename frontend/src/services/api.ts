@@ -375,6 +375,112 @@ export const smartIdentificationApi = {
 };
 
 // ============================================
+// Meals API
+// ============================================
+
+export interface Macros {
+  kcal: number;
+  protein_g: number;
+  carbs_g: number;
+  fat_g: number;
+}
+
+export interface MealItem {
+  food_id: string;
+  label: string;
+  grams: number;
+  kcal: number;
+  protein_g: number;
+  carbs_g: number;
+  fat_g: number;
+}
+
+export interface Meal {
+  meal_id: string;
+  timestamp: string;
+  items: MealItem[];
+  total_kcal: number;
+  notes?: string;
+}
+
+export interface MealTotalResponse {
+  total_kcal: number;
+  total_protein_g: number;
+  total_carbs_g: number;
+  total_fat_g: number;
+  meal_count: number;
+  meals: Meal[];
+}
+
+export const mealsApi = {
+  getTodayTotals: async (): Promise<MealTotalResponse> => {
+    const response = await apiClient.get(config.endpoints.meals.today);
+    return response.data;
+  },
+
+  getMealsByDate: async (dateStr: string): Promise<MealTotalResponse> => {
+    const response = await apiClient.get(`${config.endpoints.meals.today}?date=${dateStr}`);
+    return response.data;
+  },
+};
+
+// ============================================
+// Foods API
+// ============================================
+
+export interface Food {
+  food_id: string;
+  name: string;
+  kcal_per_100g: number;
+  protein_per_100g: number;
+  carbs_per_100g: number;
+  fat_per_100g: number;
+}
+
+export interface FoodCreate {
+  name: string;
+  kcal_per_100g: number;
+  protein_per_100g: number;
+  carbs_per_100g: number;
+  fat_per_100g: number;
+}
+
+export interface FoodUpdate {
+  name?: string;
+  kcal_per_100g?: number;
+  protein_per_100g?: number;
+  carbs_per_100g?: number;
+  fat_per_100g?: number;
+}
+
+export const foodsApi = {
+  listAll: async (): Promise<Food[]> => {
+    const response = await apiClient.get(config.endpoints.foods);
+    return response.data;
+  },
+
+  getById: async (foodId: string): Promise<Food> => {
+    const response = await apiClient.get(`${config.endpoints.foods}/${foodId}`);
+    return response.data;
+  },
+
+  create: async (data: FoodCreate): Promise<Food> => {
+    const response = await apiClient.post(config.endpoints.foods, data);
+    return response.data;
+  },
+
+  update: async (foodId: string, data: FoodUpdate): Promise<Food> => {
+    const response = await apiClient.put(`${config.endpoints.foods}/${foodId}`, data);
+    return response.data;
+  },
+
+  delete: async (foodId: string): Promise<{ status: string; food_id: string }> => {
+    const response = await apiClient.delete(`${config.endpoints.foods}/${foodId}`);
+    return response.data;
+  },
+};
+
+// ============================================
 // AI Instructions API
 // ============================================
 
