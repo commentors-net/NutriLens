@@ -158,3 +158,42 @@ async def get_meals_today():
         meal_count=len(meals),
         meals=meal_summaries,
     )
+
+
+@router.get("/range", response_model=MealTotalResponse)
+async def get_meals_by_range(start: str, end: str):
+    """
+    GET /meals/range?start=YYYY-MM-DD&end=YYYY-MM-DD
+
+    Returns totals for all meals saved between start and end dates (inclusive).
+    Useful for viewing meal history and trends over time.
+    """
+    meals = db.get_meals_by_date_range(start, end)
+
+    total_kcal = 0
+    total_protein = 0.0
+    total_carbs = 0.0
+    total_fat = 0.0
+    meal_summaries = []
+
+    for meal in meals:
+        meal_kcal = sum(it.get("kcal", 0) for it in meal.get("items", []))
+        total_kcal += meal_kcal
+        total_protein += sum(it.get("protein_g", 0.0) for it in meal.get("items", []))
+        total_carbs += sum(it.get("carbs_g", 0.0) for it in meal.get("items", []))
+        total_fat += sum(it.get("fat_g", 0.0) for it in meal.get("items", []))
+        meal_summaries.append({
+            "meal_id": meal.get("meal_id"),
+            "timestamp": meal.get("timestamp"),
+            "item_count": len(meal.get("items", [])),
+            "total_kcal": meal_kcal,
+        })
+
+    return MealTotalResponse(
+        total_kcal=total_kcal,
+        total_protein_g=round(total_protein, 1),
+        total_carbs_g=round(total_carbs, 1),
+        total_fat_g=round(total_fat, 1),
+        meal_count=len(meals),
+        meals=meal_summaries,
+    )

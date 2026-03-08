@@ -179,6 +179,19 @@ export const authApi = {
     );
     return response.data;
   },
+
+  getNutriLensProfile: async (system: AuthSystem = ""): Promise<any> => {
+    const response = await apiClient.get(`${authBasePath(system)}/nutrilens-profile`);
+    return response.data;
+  },
+
+  updateNutriLensProfile: async (
+    data: any,
+    system: AuthSystem = "",
+  ): Promise<any> => {
+    const response = await apiClient.patch(`${authBasePath(system)}/nutrilens-profile`, data);
+    return response.data;
+  },
 };
 
 // ============================================
@@ -420,6 +433,11 @@ export const mealsApi = {
 
   getMealsByDate: async (dateStr: string): Promise<MealTotalResponse> => {
     const response = await apiClient.get(`${config.endpoints.meals.today}?date=${dateStr}`);
+    return response.data;
+  },
+
+  getMealsByRange: async (startDate: string, endDate: string): Promise<MealTotalResponse> => {
+    const response = await apiClient.get(`${config.apiUrl}/meals/range?start=${startDate}&end=${endDate}`);
     return response.data;
   },
 };

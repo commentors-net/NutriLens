@@ -3,6 +3,8 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 export const config = {
   apiUrl: API_URL,
+  // Google OAuth Configuration
+  googleClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID || '',
   // Feature toggles
   features: {
     // Set to true to enable public registration

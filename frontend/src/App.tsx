@@ -28,6 +28,8 @@ import NutriLensPortal from '@pages/NutriLensPortal';
 import NutriLensUsers from '@pages/NutriLensUsers';
 import NutriLensMeals from '@pages/NutriLensMeals';
 import NutriLensNutrition from '@pages/NutriLensNutrition';
+import NutriLensHistory from '@pages/NutriLensHistory';
+import NutriLensProfile from '@pages/NutriLensProfile';
 import NutriLensDashboard from '@pages/NutriLensDashboard';
 import config from '@/config';
 
@@ -100,7 +102,9 @@ function AppContent() {
           { label: 'NutriLens', path: '/nutrilens' },
           { label: 'Dashboard', path: '/nutrilens/dashboard' },
           { label: 'Meals', path: '/nutrilens/meals' },
+          { label: 'History', path: '/nutrilens/history' },
           { label: 'Nutrition', path: '/nutrilens/nutrition' },
+          { label: 'Profile', path: '/nutrilens/profile' },
           { label: 'Users', path: '/nutrilens/users' },
         ]
       : selectedSystem === 'leave-tracker'
@@ -150,8 +154,14 @@ function AppContent() {
                   <Button color="inherit" component={Link} to="/nutrilens/meals" size="small">
                     Meals
                   </Button>
+                  <Button color="inherit" component={Link} to="/nutrilens/history" size="small">
+                    History
+                  </Button>
                   <Button color="inherit" component={Link} to="/nutrilens/nutrition" size="small">
                     Nutrition
+                  </Button>
+                  <Button color="inherit" component={Link} to="/nutrilens/profile" size="small">
+                    Profile
                   </Button>
                   <Button color="inherit" component={Link} to="/nutrilens/users" size="small">
                     Users
@@ -273,6 +283,14 @@ function AppContent() {
           <Route
             path="/nutrilens/meals"
             element={isLoggedIn && selectedSystem === 'nutrilens' && canUseNutriLens ? <NutriLensMeals /> : <Navigate to="/app-select" replace />}
+          />
+          <Route
+            path="/nutrilens/history"
+            element={isLoggedIn && selectedSystem === 'nutrilens' && canUseNutriLens ? <NutriLensHistory /> : <Navigate to="/app-select" replace />}
+          />
+          <Route
+            path="/nutrilens/profile"
+            element={isLoggedIn && selectedSystem === 'nutrilens' && canUseNutriLens ? <NutriLensProfile /> : <Navigate to="/app-select" replace />}
           />
           <Route
             path="/nutrilens/nutrition"

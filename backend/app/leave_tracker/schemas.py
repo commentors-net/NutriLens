@@ -66,6 +66,18 @@ class UserDetailResponse(BaseModel):
     allowed_systems: list[str]
     is_admin: bool
 
+class NutriLensProfile(BaseModel):
+    """User profile for NutriLens system (dietary goals and preferences)."""
+    daily_calorie_goal: int = 2000  # Default 2000 calories
+    protein_goal_g: float = 100.0   # Default 100g protein
+    carbs_goal_g: float = 250.0     # Default 250g carbs
+    fat_goal_g: float = 65.0        # Default 65g fat
+    dietary_restrictions: list[str] = []  # e.g., ["vegetarian", "gluten-free", "dairy-free"]
+
+class NutriLensProfileResponse(NutriLensProfile):
+    """Response model with username included."""
+    username: str
+
 class PasswordChange(BaseModel):
     username: str
     old_password: str

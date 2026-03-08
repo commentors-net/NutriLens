@@ -44,17 +44,31 @@ class NutriLensFirestoreDB:
                 inserted += 1
         return inserted
 
+    def _map_food_fields(self, food_doc: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Map Firestore field names to API field names.
+        Database has: protein_g_per_100g, carbs_g_per_100g, fat_g_per_100g
+        API expects: protein_per_100g, carbs_per_100g, fat_per_100g
+        """
+        if "protein_g_per_100g" in food_doc:
+            food_doc["protein_per_100g"] = food_doc["protein_g_per_100g"]
+        if "carbs_g_per_100g" in food_doc:
+            food_doc["carbs_per_100g"] = food_doc["carbs_g_per_100g"]
+        if "fat_g_per_100g" in food_doc:
+            food_doc["fat_per_100g"] = food_doc["fat_g_per_100g"]
+        return food_doc
+
     def get_all_foods(self) -> List[Dict[str, Any]]:
         """Return all food documents."""
         docs = self.db.collection(self.FOODS).stream()
-        return [{"id": d.id, **d.to_dict()} for d in docs]
+        return [self._map_food_fields({"id": d.id, **d.to_dict()}) for d in docs]
 
     def get_food_by_id(self, food_id: str) -> Optional[Dict[str, Any]]:
         """Return a single food document by food_id."""
         ref = self.db.collection(self.FOODS).document(food_id)
         doc = ref.get()
         if doc.exists:
-            return {"id": doc.id, **doc.to_dict()}
+            return self._map_food_fields({"id": doc.id, **doc.to_dict()})
         return None
 
     def get_food_by_name(self, name: str) -> Optional[Dict[str, Any]]:
@@ -66,7 +80,7 @@ class NutriLensFirestoreDB:
             .stream()
         )
         for doc in docs:
-            return {"id": doc.id, **doc.to_dict()}
+            return self._map_food_fields({"id": doc.id, **doc.to_dict()})
         return None
 
     def get_food_count(self) -> int:
@@ -80,8 +94,17 @@ class NutriLensFirestoreDB:
         if not food_id:
             raise ValueError("food_id is required")
         
-        self.db.collection(self.FOODS).document(food_id).set(food)
-        return food
+        # Map API schema to database schema when saving
+        db_food = food.copy()
+        if "protein_per_100g" in db_food:
+            db_food["protein_g_per_100g"] = db_food.pop("protein_per_100g")
+        if "carbs_per_100g" in db_food:
+            db_food["carbs_g_per_100g"] = db_food.pop("carbs_per_100g")
+        if "fat_per_100g" in db_food:
+            db_food["fat_g_per_100g"] = db_food.pop("fat_per_100g")
+        
+        self.db.collection(self.FOODS).document(food_id).set(db_food)
+        return food  # Return original food with API schema
 
     def delete_food(self, food_id: str) -> None:
         """Delete a food document."""
@@ -120,6 +143,19 @@ class NutriLensFirestoreDB:
         docs = (
             self.db.collection(self.MEALS)
             .where("date_str", "==", date_str)
+            .stream()
+        )
+        return [{"id": d.id, **d.to_dict()} for d in docs]
+
+    def get_meals_by_date_range(self, start_date: str, end_date: str) -> List[Dict[str, Any]]:
+        """
+        Return all meals between start_date and end_date (inclusive, YYYY-MM-DD format).
+        """
+        docs = (
+            self.db.collection(self.MEALS)
+            .where("date_str", ">=", start_date)
+            .where("date_str", "<=", end_date)
+            .order_by("timestamp", direction="DESCENDING")
             .stream()
         )
         return [{"id": d.id, **d.to_dict()} for d in docs]

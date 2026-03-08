@@ -289,3 +289,36 @@ def change_user_password(data: schemas.PasswordChange):
         return {"success": True, "message": "Password changed successfully"}
     except ValueError as e:
         raise HTTPException(status_code=401, detail=str(e))
+
+
+# ==================== NUTRILENS PROFILE ====================
+
+@router.get("/nutrilens-profile", response_model=schemas.NutriLensProfileResponse)
+def get_nutrilens_profile(current_user: str = Depends(get_current_user)):
+    """Get NutriLens profile for current user (dietary goals and preferences)."""
+    user = db.get_user_by_username(current_user)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    profile = db.get_nutrilens_profile(user["id"])
+    return schemas.NutriLensProfileResponse(
+        username=current_user,
+        **profile
+    )
+
+
+@router.patch("/nutrilens-profile", response_model=schemas.NutriLensProfileResponse)
+def update_nutrilens_profile(
+    profile_update: schemas.NutriLensProfile,
+    current_user: str = Depends(get_current_user)
+):
+    """Update NutriLens profile for current user."""
+    user = db.get_user_by_username(current_user)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    updated = db.update_nutrilens_profile(user["id"], profile_update.dict())
+    return schemas.NutriLensProfileResponse(
+        username=current_user,
+        **updated
+    )

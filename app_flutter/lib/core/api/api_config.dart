@@ -1,9 +1,13 @@
 /// API configuration.
-/// Production: Cloud Run backend
-/// Development: Local backend (use PC's local IP, e.g. 192.168.0.10)
+/// Environment is now dynamically selected via environment provider.
+/// See lib/core/config/environment.dart for details.
+
+// Dynamic configuration - use apiBaseUrlProvider instead
+// const String kBackendBaseUrl = 'https://nutrilens-api-2ajzj2dbrq-uc.a.run.app';
 
 // Production (Cloud Run)
-const String kBackendBaseUrl = 'https://nutrilens-api-427212681311.us-central1.run.app';
+const String kBackendBaseUrlProd = 'https://nutrilens-api-2ajzj2dbrq-uc.a.run.app';
 
-// Development (Local) — uncomment to use local backend
-// const String kBackendBaseUrl = 'http://192.168.0.10:8000';
+// Development (Local) — Change IP to your machine's IP if not using emulator
+const String kBackendBaseUrlDebug = 'http://10.0.2.2:8000'; // For Android emulator
+// const String kBackendBaseUrlDebug = 'http://192.168.0.10:8000'; // For physical device

@@ -103,9 +103,9 @@ def compute_macros_from_food(food: Dict[str, Any], grams: int) -> Dict[str, Any]
     factor = grams / 100.0
     return {
         "kcal": int(round(food["kcal_per_100g"] * factor)),
-        "protein_g": round(food["protein_g_per_100g"] * factor, 1),
-        "carbs_g": round(food["carbs_g_per_100g"] * factor, 1),
-        "fat_g": round(food["fat_g_per_100g"] * factor, 1),
+        "protein_g": round(food["protein_per_100g"] * factor, 1),
+        "carbs_g": round(food["carbs_per_100g"] * factor, 1),
+        "fat_g": round(food["fat_per_100g"] * factor, 1),
     }
 
 

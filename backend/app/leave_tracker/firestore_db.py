@@ -93,6 +93,36 @@ class FirestoreDB:
         self.set_user_system_access(user_id, default_systems)
         return default_systems
     
+    # ==================== NUTRILENS PROFILE ====================
+    
+    def get_nutrilens_profile(self, user_id: str) -> Dict[str, Any]:
+        """Get NutriLens profile for a user. Returns defaults if not yet configured."""
+        profile_doc = self.db.collection("nutrilens_profiles").document(user_id).get()
+        if profile_doc.exists:
+            return profile_doc.to_dict()
+        
+        # Return default profile
+        return {
+            "daily_calorie_goal": 2000,
+            "protein_goal_g": 100.0,
+            "carbs_goal_g": 250.0,
+            "fat_goal_g": 65.0,
+            "dietary_restrictions": []
+        }
+    
+    def update_nutrilens_profile(self, user_id: str, profile: Dict[str, Any]) -> Dict[str, Any]:
+        """Update NutriLens profile for a user."""
+        profile_data = {
+            "daily_calorie_goal": profile.get("daily_calorie_goal", 2000),
+            "protein_goal_g": profile.get("protein_goal_g", 100.0),
+            "carbs_goal_g": profile.get("carbs_goal_g", 250.0),
+            "fat_goal_g": profile.get("fat_goal_g", 65.0),
+            "dietary_restrictions": profile.get("dietary_restrictions", []),
+            "updated_at": datetime.now().isoformat()
+        }
+        self.db.collection("nutrilens_profiles").document(user_id).set(profile_data, merge=True)
+        return profile_data
+    
     # ==================== AI INSTRUCTIONS ====================
     
     def get_ai_instructions(self) -> Optional[Dict[str, Any]]:

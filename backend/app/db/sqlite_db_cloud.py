@@ -89,7 +89,19 @@ class NutriLensSQLiteDB:
         cursor.execute("SELECT * FROM foods")
         rows = cursor.fetchall()
         conn.close()
-        return [dict(row) for row in rows]
+        # Map database field names (with _g suffix) to API field names (without _g)
+        foods = []
+        for row in rows:
+            food_dict = dict(row)
+            foods.append({
+                "food_id": food_dict["food_id"],
+                "name": food_dict["name"],
+                "kcal_per_100g": food_dict["kcal_per_100g"],
+                "protein_per_100g": food_dict["protein_g_per_100g"],
+                "carbs_per_100g": food_dict["carbs_g_per_100g"],
+                "fat_per_100g": food_dict["fat_g_per_100g"],
+            })
+        return foods
 
     def get_food_by_id(self, food_id: str) -> Optional[Dict[str, Any]]:
         conn = self._get_connection()
@@ -97,7 +109,17 @@ class NutriLensSQLiteDB:
         cursor.execute("SELECT * FROM foods WHERE food_id = ?", (food_id,))
         row = cursor.fetchone()
         conn.close()
-        return dict(row) if row else None
+        if row:
+            food_dict = dict(row)
+            return {
+                "food_id": food_dict["food_id"],
+                "name": food_dict["name"],
+                "kcal_per_100g": food_dict["kcal_per_100g"],
+                "protein_per_100g": food_dict["protein_g_per_100g"],
+                "carbs_per_100g": food_dict["carbs_g_per_100g"],
+                "fat_per_100g": food_dict["fat_g_per_100g"],
+            }
+        return None
 
     def get_food_by_name(self, name: str) -> Optional[Dict[str, Any]]:
         """Exact, case-insensitive match."""
@@ -108,7 +130,17 @@ class NutriLensSQLiteDB:
         )
         row = cursor.fetchone()
         conn.close()
-        return dict(row) if row else None
+        if row:
+            food_dict = dict(row)
+            return {
+                "food_id": food_dict["food_id"],
+                "name": food_dict["name"],
+                "kcal_per_100g": food_dict["kcal_per_100g"],
+                "protein_per_100g": food_dict["protein_g_per_100g"],
+                "carbs_per_100g": food_dict["carbs_g_per_100g"],
+                "fat_per_100g": food_dict["fat_g_per_100g"],
+            }
+        return None
 
     def get_food_count(self) -> int:
         conn = self._get_connection()
@@ -127,16 +159,17 @@ class NutriLensSQLiteDB:
         conn = self._get_connection()
         cursor = conn.cursor()
         
+        # Map API field names (without _g) to database column names (with _g)
         cursor.execute(
             """
-            INSERT INTO foods (food_id, name, kcal_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g)
+            INSERT INTO foods (food_id, name, kcal_per_100g, protein_g_per_100g, carbs_g_per_100g, fat_g_per_100g)
             VALUES (?, ?, ?, ?, ?, ?)
             ON CONFLICT(food_id) DO UPDATE SET
                 name = excluded.name,
                 kcal_per_100g = excluded.kcal_per_100g,
-                protein_per_100g = excluded.protein_per_100g,
-                carbs_per_100g = excluded.carbs_per_100g,
-                fat_per_100g = excluded.fat_per_100g
+                protein_g_per_100g = excluded.protein_g_per_100g,
+                carbs_g_per_100g = excluded.carbs_g_per_100g,
+                fat_g_per_100g = excluded.fat_g_per_100g
             """,
             (
                 food_id,
@@ -191,6 +224,23 @@ class NutriLensSQLiteDB:
         conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM meals WHERE date_str = ?", (date_str,))
+        rows = cursor.fetchall()
+        conn.close()
+        result = []
+        for row in rows:
+            meal = dict(row)
+            meal["items"] = json.loads(meal.get("items", "[]"))
+            result.append(meal)
+        return result
+
+    def get_meals_by_date_range(self, start_date: str, end_date: str) -> List[Dict[str, Any]]:
+        """Return all meals between start_date and end_date (inclusive, YYYY-MM-DD format)."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT * FROM meals WHERE date_str >= ? AND date_str <= ? ORDER BY timestamp DESC",
+            (start_date, end_date),
+        )
         rows = cursor.fetchall()
         conn.close()
         result = []

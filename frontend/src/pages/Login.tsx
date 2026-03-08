@@ -1,24 +1,18 @@
-
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { TextField, Button, Card, Typography, Box, Divider } from "@mui/material";
+import { TextField, Button, Card, Typography, Box, Divider, Alert } from "@mui/material";
+import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
 import { authApi } from "@services/api";
-
-declare global {
-  interface Window {
-    google?: any;
-  }
-}
+import { config } from "@/config";
 
 export default function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [token, setToken] = useState("");
+  const [error, setError] = useState<string>("");
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const googleButtonRef = useRef<HTMLDivElement | null>(null);
-  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
 
   const isNutriLens = location.pathname.includes("/nutrilens/");
   const system: "" | "leave-tracker" | "nutrilens" = isNutriLens
@@ -39,93 +33,104 @@ export default function Login() {
   };
 
   const handleLogin = async () => {
+    setError("");
     try {
       const res = await authApi.login({ username, password, token }, system);
       completeLogin(res);
     } catch (err: any) {
       const errorMsg = err.response?.data?.detail || "Login failed: Invalid credentials or 2FA token";
-      alert(errorMsg);
+      setError(errorMsg);
     }
   };
 
-  useEffect(() => {
-    if (!googleClientId || !googleButtonRef.current) {
+  const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
+    if (!credentialResponse.credential) {
+      setError("Google login failed: No credential received");
       return;
     }
-
-    const existingScript = document.getElementById("google-gsi-script");
-    const initializeGoogle = () => {
-      if (!window.google?.accounts?.id) {
-        return;
-      }
-
-      window.google.accounts.id.initialize({
-        client_id: googleClientId,
-        callback: async (response: { credential: string }) => {
-          if (!response?.credential) {
-            return;
-          }
-          setIsGoogleLoading(true);
-          try {
-            const res = await authApi.googleLogin({ id_token: response.credential }, system);
-            completeLogin(res);
-          } catch (err: any) {
-            const errorMsg = err.response?.data?.detail || "Google login failed";
-            alert(errorMsg);
-          } finally {
-            setIsGoogleLoading(false);
-          }
-        },
-      });
-
-      googleButtonRef.current!.innerHTML = "";
-      window.google.accounts.id.renderButton(googleButtonRef.current, {
-        theme: "outline",
-        size: "large",
-        width: 320,
-        text: "continue_with",
-      });
-    };
-
-    if (existingScript) {
-      initializeGoogle();
-      return;
+    
+    setError("");
+    setIsGoogleLoading(true);
+    try {
+      const res = await authApi.googleLogin(
+        { id_token: credentialResponse.credential },
+        system
+      );
+      completeLogin(res);
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.detail || "Google login failed";
+      setError(errorMsg);
+    } finally {
+      setIsGoogleLoading(false);
     }
+  };
 
-    const script = document.createElement("script");
-    script.id = "google-gsi-script";
-    script.src = "https://accounts.google.com/gsi/client";
-    script.async = true;
-    script.defer = true;
-    script.onload = initializeGoogle;
-    document.body.appendChild(script);
-  }, [googleClientId, system]);
+  const handleGoogleError = () => {
+    setError("Google login failed. Please try again.");
+  };
 
   return (
     <Card sx={{ p: { xs: 2, sm: 3, md: 4 }, maxWidth: 400, width: '100%', mx: "auto", mt: { xs: 4, sm: 6, md: 10 } }}>
       <Typography variant="h6" sx={{ mb: 2 }}>
         {isNutriLens ? "NutriLens Login" : "Leave Tracker Login"}
       </Typography>
-      <TextField label="Username" value={username} onChange={e => setUsername(e.target.value)} fullWidth margin="normal" />
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
+
+      <TextField 
+        label="Username" 
+        value={username} 
+        onChange={e => setUsername(e.target.value)} 
+        fullWidth 
+        margin="normal"
+        onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
+      />
       <TextField 
         label="Password" 
         type="password"
         value={password} 
         onChange={e => setPassword(e.target.value)} 
         fullWidth 
-        margin="normal" 
+        margin="normal"
+        onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
       />
-      <TextField label="2FA Token" value={token} onChange={e => setToken(e.target.value)} fullWidth margin="normal" />
-      <Button variant="contained" fullWidth onClick={handleLogin} sx={{ mt: 2 }}>Login</Button>
+      <TextField 
+        label="2FA Token" 
+        value={token} 
+        onChange={e => setToken(e.target.value)} 
+        fullWidth 
+        margin="normal"
+        onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
+      />
+      <Button variant="contained" fullWidth onClick={handleLogin} sx={{ mt: 2 }}>
+        Login
+      </Button>
 
       <Divider sx={{ my: 3 }}>OR</Divider>
-      {googleClientId ? (
+
+      {config.googleClientId ? (
         <Box sx={{ display: "flex", justifyContent: "center", minHeight: 40 }}>
-          {isGoogleLoading ? <Typography variant="body2">Signing in with Google...</Typography> : <div ref={googleButtonRef} />}
+          {isGoogleLoading ? (
+            <Typography variant="body2">Signing in with Google...</Typography>
+          ) : (
+            <GoogleLogin
+              onSuccess={handleGoogleSuccess}
+              onError={handleGoogleError}
+              useOneTap
+              theme="outline"
+              size="large"
+              text="continue_with"
+              width="320"
+            />
+          )}
         </Box>
       ) : (
-        <Typography variant="caption" color="text.secondary">
-          Google SSO is disabled. Set <code>VITE_GOOGLE_CLIENT_ID</code> to enable it.
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'center' }}>
+          Google SSO is disabled. Set <code>VITE_GOOGLE_CLIENT_ID</code> in .env to enable it.
         </Typography>
       )}
     </Card>
