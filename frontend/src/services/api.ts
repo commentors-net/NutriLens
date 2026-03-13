@@ -425,6 +425,19 @@ export interface MealTotalResponse {
   meals: Meal[];
 }
 
+export interface NutriLensProfileResponse {
+  username: string;
+  daily_calorie_goal: number;
+  protein_goal_g: number;
+  carbs_goal_g: number;
+  fat_goal_g: number;
+  dietary_restrictions: string[];
+  notifications_enabled: boolean;
+  breakfast_reminder_time: string;
+  lunch_reminder_time: string;
+  dinner_reminder_time: string;
+}
+
 export const mealsApi = {
   getTodayTotals: async (): Promise<MealTotalResponse> => {
     const response = await apiClient.get(config.endpoints.meals.today);
@@ -438,6 +451,14 @@ export const mealsApi = {
 
   getMealsByRange: async (startDate: string, endDate: string): Promise<MealTotalResponse> => {
     const response = await apiClient.get(`${config.apiUrl}/meals/range?start=${startDate}&end=${endDate}`);
+    return response.data;
+  },
+
+  exportMeals: async (startDate: string, endDate: string, format: "csv" | "pdf"): Promise<Blob> => {
+    const response = await apiClient.get(`${config.apiUrl}/meals/export`, {
+      params: { start: startDate, end: endDate, format },
+      responseType: "blob",
+    });
     return response.data;
   },
 };

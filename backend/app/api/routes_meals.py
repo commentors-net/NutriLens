@@ -9,10 +9,14 @@ GET  /meals/today    — daily totals from db_factory
 import logging
 import json
 import uuid
+import csv
+from io import StringIO, BytesIO
 from datetime import date, datetime
-from typing import List, Optional
+from typing import List, Optional, Literal
 
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from fastapi.responses import StreamingResponse
+from reportlab.pdfgen import canvas
 
 from app.db.db_factory import db
 from app.models.schemas import (
@@ -25,6 +29,13 @@ from app.services.nutrition import get_food_fuzzy, compute_macros_from_food
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+def _parse_date(date_str: str) -> datetime:
+    try:
+        return datetime.strptime(date_str, "%Y-%m-%d")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid date format: {date_str}. Use YYYY-MM-DD") from exc
 
 
 @router.post("/analyze", response_model=AnalyzeMealResponse)
@@ -196,4 +207,138 @@ async def get_meals_by_range(start: str, end: str):
         total_fat_g=round(total_fat, 1),
         meal_count=len(meals),
         meals=meal_summaries,
+    )
+
+
+@router.get("/export")
+async def export_meals(start: str, end: str, format: Literal["csv", "pdf"] = "csv"):
+    """
+    GET /meals/export?format=csv|pdf&start=YYYY-MM-DD&end=YYYY-MM-DD
+
+    Exports meals in the selected date range as CSV or PDF.
+    """
+    start_date = _parse_date(start)
+    end_date = _parse_date(end)
+    if start_date > end_date:
+        raise HTTPException(status_code=400, detail="start date must be on or before end date")
+
+    meals = db.get_meals_by_date_range(start, end)
+    file_suffix = f"{start}_to_{end}"
+
+    if format == "csv":
+        output = StringIO()
+        writer = csv.writer(output)
+        writer.writerow([
+            "meal_id",
+            "date",
+            "time",
+            "item_label",
+            "grams",
+            "kcal",
+            "protein_g",
+            "carbs_g",
+            "fat_g",
+            "notes",
+        ])
+
+        for meal in meals:
+            timestamp = meal.get("timestamp", "")
+            date_part, time_part = "", ""
+            if "T" in timestamp:
+                date_part, time_part = timestamp.split("T", 1)
+                time_part = time_part[:8]
+            else:
+                date_part = timestamp[:10]
+
+            items = meal.get("items", [])
+            if not items:
+                writer.writerow([
+                    meal.get("meal_id", ""),
+                    date_part,
+                    time_part,
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    meal.get("notes", ""),
+                ])
+                continue
+
+            for item in items:
+                writer.writerow([
+                    meal.get("meal_id", ""),
+                    date_part,
+                    time_part,
+                    item.get("label", ""),
+                    item.get("grams", 0),
+                    item.get("kcal", 0),
+                    item.get("protein_g", 0),
+                    item.get("carbs_g", 0),
+                    item.get("fat_g", 0),
+                    meal.get("notes", ""),
+                ])
+
+        csv_data = output.getvalue().encode("utf-8")
+        return StreamingResponse(
+            BytesIO(csv_data),
+            media_type="text/csv",
+            headers={"Content-Disposition": f'attachment; filename="nutrilens_meals_{file_suffix}.csv"'},
+        )
+
+    pdf_buffer = BytesIO()
+    pdf = canvas.Canvas(pdf_buffer)
+    y = 800
+
+    pdf.setFont("Helvetica-Bold", 14)
+    pdf.drawString(40, y, f"NutriLens Meal Export ({start} to {end})")
+    y -= 24
+
+    pdf.setFont("Helvetica", 10)
+    if not meals:
+        pdf.drawString(40, y, "No meals found for the selected date range.")
+    else:
+        for meal in meals:
+            if y < 80:
+                pdf.showPage()
+                y = 800
+                pdf.setFont("Helvetica", 10)
+
+            timestamp = meal.get("timestamp", "")
+            meal_id = meal.get("meal_id", "")
+            notes = meal.get("notes", "")
+            items = meal.get("items", [])
+
+            total_kcal = sum(item.get("kcal", 0) for item in items)
+            pdf.setFont("Helvetica-Bold", 10)
+            pdf.drawString(40, y, f"Meal: {meal_id} | {timestamp} | Total kcal: {total_kcal}")
+            y -= 16
+
+            pdf.setFont("Helvetica", 9)
+            if notes:
+                pdf.drawString(50, y, f"Notes: {notes}")
+                y -= 14
+
+            if not items:
+                pdf.drawString(50, y, "No items")
+                y -= 14
+            else:
+                for item in items:
+                    line = (
+                        f"- {item.get('label', '')}: {item.get('grams', 0)}g, "
+                        f"{item.get('kcal', 0)} kcal, P {item.get('protein_g', 0)}g, "
+                        f"C {item.get('carbs_g', 0)}g, F {item.get('fat_g', 0)}g"
+                    )
+                    pdf.drawString(50, y, line[:140])
+                    y -= 12
+
+            y -= 8
+
+    pdf.save()
+    pdf_buffer.seek(0)
+    return StreamingResponse(
+        pdf_buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="nutrilens_meals_{file_suffix}.pdf"'},
     )

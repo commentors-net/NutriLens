@@ -19,6 +19,7 @@ import MenuIcon from '@mui/icons-material/Menu';
 import { useState, useEffect } from 'react';
 import Login from '@pages/Login';
 import { useVersionCheck } from '@/hooks/useVersionCheck';
+import { useMealReminders } from '@/hooks/useMealReminders';
 import { UpdateBanner } from '@/components/UpdateBanner';
 import Register from '@pages/Register';
 import Dashboard from '@pages/Dashboard';
@@ -97,6 +98,7 @@ function AppContent() {
   const selectedSystem = localStorage.getItem('selected_system') || '';
   const canUseLeaveTracker = allowedSystems.includes('leave-tracker');
   const canUseNutriLens = allowedSystems.includes('nutrilens');
+  useMealReminders(isLoggedIn && selectedSystem === 'nutrilens' && canUseNutriLens);
 
   const navItems = isLoggedIn
     ? selectedSystem === 'nutrilens'

@@ -24,6 +24,7 @@ import LocalFireDepartmentIcon from "@mui/icons-material/LocalFireDepartment";
 import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 import ShowChartIcon from "@mui/icons-material/ShowChart";
 import PieChartIcon from "@mui/icons-material/PieChart";
+import DownloadIcon from "@mui/icons-material/Download";
 import {
   LineChart,
   Line,
@@ -55,6 +56,7 @@ export default function NutriLensHistory() {
   const [startDate, setStartDate] = useState(thirtyDaysAgo.toISOString().split("T")[0]);
   const [endDate, setEndDate] = useState(today.toISOString().split("T")[0]);
   const [refreshing, setRefreshing] = useState(false);
+  const [exportingFormat, setExportingFormat] = useState<"csv" | "pdf" | null>(null);
 
   const fetchMeals = async (start: string, end: string) => {
     setRefreshing(true);
@@ -86,6 +88,26 @@ export default function NutriLensHistory() {
     setStartDate(start.toISOString().split("T")[0]);
     setEndDate(end.toISOString().split("T")[0]);
     fetchMeals(start.toISOString().split("T")[0], end.toISOString().split("T")[0]);
+  };
+
+  const handleExport = async (format: "csv" | "pdf") => {
+    try {
+      setExportingFormat(format);
+      const blob = await mealsApi.exportMeals(startDate, endDate, format);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `nutrilens_meals_${startDate}_to_${endDate}.${format}`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err: any) {
+      const message = err?.response?.data?.detail || "Failed to export meals";
+      setError(String(message));
+    } finally {
+      setExportingFormat(null);
+    }
   };
 
   // Group meals by date
@@ -202,6 +224,22 @@ export default function NutriLensHistory() {
               disabled={refreshing}
             >
               Apply
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<DownloadIcon />}
+              onClick={() => handleExport("csv")}
+              disabled={!!exportingFormat}
+            >
+              {exportingFormat === "csv" ? "Exporting CSV..." : "Export CSV"}
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<DownloadIcon />}
+              onClick={() => handleExport("pdf")}
+              disabled={!!exportingFormat}
+            >
+              {exportingFormat === "pdf" ? "Exporting PDF..." : "Export PDF"}
             </Button>
           </Stack>
 

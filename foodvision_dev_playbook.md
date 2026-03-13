@@ -11,6 +11,50 @@
 
 ---
 
+## ▶ RESUME HERE — Last session: 2026-03-13 — Phase P4 Complete ✅
+
+**STATUS AT SESSION END (2026-03-13):**
+- ✅ Phase P4.3 (User Profile & Preferences) is complete.
+- ✅ Phase P4.4 (Export Meal Data) is complete.
+- ✅ Phase P4.5 (Meal Reminders & Notifications) is complete.
+- ✅ Phase P4 as a whole is now complete.
+
+**What was completed this session:**
+1. ✅ Completed P4.3 dashboard goal tracking:
+  - `frontend/src/pages/NutriLensDashboard.tsx` now fetches NutriLens profile goals and shows progress for calories, protein, carbs, and fat.
+2. ✅ Completed P4.4 meal export backend:
+  - `backend/app/api/routes_meals.py` now provides `GET /meals/export?format=csv|pdf&start=...&end=...`.
+  - CSV export is generated with Python `csv`.
+  - PDF export is generated with `reportlab`.
+3. ✅ Completed P4.4 export actions in frontend:
+  - `frontend/src/pages/NutriLensHistory.tsx` now provides Export CSV and Export PDF actions for the selected range.
+  - `frontend/src/pages/NutriLensDashboard.tsx` now provides Export Today CSV and Export Today PDF actions.
+4. ✅ Completed P4.5 meal reminders:
+  - NutriLens profile now stores browser reminder preferences and meal reminder times.
+  - `frontend/src/pages/NutriLensProfile.tsx` now allows enabling notifications and configuring breakfast/lunch/dinner reminder times.
+  - `frontend/src/hooks/useMealReminders.ts` runs app-wide reminder scheduling while NutriLens is active.
+5. ✅ Completed local-dev compatibility for reminders:
+  - `backend/app/leave_tracker/sqlite_db.py` now supports NutriLens profile persistence, matching Firestore behavior.
+
+**Phase P4 Outcome:**
+- P4.1 History and charts: complete
+- P4.2 Google SSO: complete
+- P4.3 Profile and goal tracking: complete
+- P4.4 Export CSV/PDF: complete
+- P4.5 Browser meal reminders: complete
+
+**Recommended next implementation options:**
+1. Phase P5 NutriLens Admin UI cleanup and data realism:
+  - Replace simulated dashboard trend data with real aggregated meal history.
+  - Replace randomized top-food counts with real usage aggregation.
+2. Milestone 4 AI integration:
+  - Move from deterministic mock analysis to real food detection and portion estimation.
+3. Deployment follow-up:
+  - Deploy latest backend/frontend changes.
+  - Create the Firestore composite index for `/meals/range` if not already created.
+
+---
+
 ## ▶ RESUME HERE — Last session: 2026-03-13 — Frontend Version Refresh + Google Auth Troubleshooting ✅
 
 **STATUS AT SESSION END (2026-03-13):**

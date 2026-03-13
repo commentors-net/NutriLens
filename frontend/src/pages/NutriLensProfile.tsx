@@ -9,8 +9,12 @@ import {
   Stack,
   Chip,
   LinearProgress,
+  FormControlLabel,
+  Switch,
 } from "@mui/material";
 import { authApi } from "@services/api";
+
+const PROFILE_CACHE_KEY = "nutrilens_profile_cache";
 
 interface NutriLensProfile {
   username: string;
@@ -19,6 +23,10 @@ interface NutriLensProfile {
   carbs_goal_g: number;
   fat_goal_g: number;
   dietary_restrictions: string[];
+  notifications_enabled: boolean;
+  breakfast_reminder_time: string;
+  lunch_reminder_time: string;
+  dinner_reminder_time: string;
 }
 
 export default function NutriLensProfile() {
@@ -28,6 +36,9 @@ export default function NutriLensProfile() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [restrictionInput, setRestrictionInput] = useState("");
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | "unsupported">(
+    typeof Notification === "undefined" ? "unsupported" : Notification.permission
+  );
 
   useEffect(() => {
     loadProfile();
@@ -38,6 +49,10 @@ export default function NutriLensProfile() {
       setLoading(true);
       const data = await authApi.getNutriLensProfile("nutrilens");
       setProfile(data);
+      localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(data));
+      if (typeof Notification !== "undefined") {
+        setNotificationPermission(Notification.permission);
+      }
       setError("");
     } catch (err: any) {
       setError(err.response?.data?.detail || "Failed to load profile");
@@ -59,10 +74,15 @@ export default function NutriLensProfile() {
           carbs_goal_g: profile.carbs_goal_g,
           fat_goal_g: profile.fat_goal_g,
           dietary_restrictions: profile.dietary_restrictions,
+          notifications_enabled: profile.notifications_enabled,
+          breakfast_reminder_time: profile.breakfast_reminder_time,
+          lunch_reminder_time: profile.lunch_reminder_time,
+          dinner_reminder_time: profile.dinner_reminder_time,
         },
         "nutrilens"
       );
       setProfile({ ...profile, ...updated });
+      localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify({ ...profile, ...updated }));
       setSuccess(true);
       setError("");
     } catch (err: any) {
@@ -95,6 +115,24 @@ export default function NutriLensProfile() {
           (r) => r !== restriction
         ),
       });
+    }
+  };
+
+  const requestNotificationPermission = async () => {
+    if (typeof Notification === "undefined") {
+      setNotificationPermission("unsupported");
+      setError("This browser does not support notifications.");
+      return;
+    }
+
+    const permission = await Notification.requestPermission();
+    setNotificationPermission(permission);
+    if (permission === "granted" && profile) {
+      setProfile({ ...profile, notifications_enabled: true });
+      setError("");
+    }
+    if (permission === "denied") {
+      setError("Browser notifications are blocked. Enable them in your browser settings to use meal reminders.");
     }
   };
 
@@ -238,6 +276,87 @@ export default function NutriLensProfile() {
             <Typography variant="caption" color="text.secondary">
               e.g., vegetarian, gluten-free, dairy-free, keto, vegan
             </Typography>
+          </Box>
+
+          <Box sx={{ border: "1px solid #ddd", p: 2, borderRadius: 1 }}>
+            <Typography variant="subtitle2" sx={{ mb: 2 }}>
+              Meal Reminders
+            </Typography>
+            <Stack spacing={2}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={profile.notifications_enabled}
+                    onChange={(e) =>
+                      setProfile({
+                        ...profile,
+                        notifications_enabled: e.target.checked,
+                      })
+                    }
+                    disabled={notificationPermission === "denied" || notificationPermission === "unsupported"}
+                  />
+                }
+                label="Enable browser meal reminders"
+              />
+
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                <TextField
+                  label="Breakfast reminder"
+                  type="time"
+                  value={profile.breakfast_reminder_time}
+                  onChange={(e) =>
+                    setProfile({
+                      ...profile,
+                      breakfast_reminder_time: e.target.value,
+                    })
+                  }
+                  InputLabelProps={{ shrink: true }}
+                  inputProps={{ step: 60 }}
+                  fullWidth
+                />
+                <TextField
+                  label="Lunch reminder"
+                  type="time"
+                  value={profile.lunch_reminder_time}
+                  onChange={(e) =>
+                    setProfile({
+                      ...profile,
+                      lunch_reminder_time: e.target.value,
+                    })
+                  }
+                  InputLabelProps={{ shrink: true }}
+                  inputProps={{ step: 60 }}
+                  fullWidth
+                />
+                <TextField
+                  label="Dinner reminder"
+                  type="time"
+                  value={profile.dinner_reminder_time}
+                  onChange={(e) =>
+                    setProfile({
+                      ...profile,
+                      dinner_reminder_time: e.target.value,
+                    })
+                  }
+                  InputLabelProps={{ shrink: true }}
+                  inputProps={{ step: 60 }}
+                  fullWidth
+                />
+              </Stack>
+
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ sm: "center" }}>
+                <Button variant="outlined" onClick={requestNotificationPermission}>
+                  Enable Browser Notifications
+                </Button>
+                <Typography variant="caption" color="text.secondary">
+                  Permission status: {notificationPermission}
+                </Typography>
+              </Stack>
+
+              <Typography variant="caption" color="text.secondary">
+                Reminders run while the web app is open in your browser and notification permission is granted.
+              </Typography>
+            </Stack>
           </Box>
 
           <Box sx={{ display: "flex", gap: 2, pt: 2 }}>

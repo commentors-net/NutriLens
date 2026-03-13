@@ -107,7 +107,11 @@ class FirestoreDB:
             "protein_goal_g": 100.0,
             "carbs_goal_g": 250.0,
             "fat_goal_g": 65.0,
-            "dietary_restrictions": []
+            "dietary_restrictions": [],
+            "notifications_enabled": False,
+            "breakfast_reminder_time": "08:00",
+            "lunch_reminder_time": "13:00",
+            "dinner_reminder_time": "19:00",
         }
     
     def update_nutrilens_profile(self, user_id: str, profile: Dict[str, Any]) -> Dict[str, Any]:
@@ -118,6 +122,10 @@ class FirestoreDB:
             "carbs_goal_g": profile.get("carbs_goal_g", 250.0),
             "fat_goal_g": profile.get("fat_goal_g", 65.0),
             "dietary_restrictions": profile.get("dietary_restrictions", []),
+            "notifications_enabled": profile.get("notifications_enabled", False),
+            "breakfast_reminder_time": profile.get("breakfast_reminder_time", "08:00"),
+            "lunch_reminder_time": profile.get("lunch_reminder_time", "13:00"),
+            "dinner_reminder_time": profile.get("dinner_reminder_time", "19:00"),
             "updated_at": datetime.now().isoformat()
         }
         self.db.collection("nutrilens_profiles").document(user_id).set(profile_data, merge=True)

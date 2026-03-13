@@ -73,6 +73,10 @@ class NutriLensProfile(BaseModel):
     carbs_goal_g: float = 250.0     # Default 250g carbs
     fat_goal_g: float = 65.0        # Default 65g fat
     dietary_restrictions: list[str] = []  # e.g., ["vegetarian", "gluten-free", "dairy-free"]
+    notifications_enabled: bool = False
+    breakfast_reminder_time: str = "08:00"
+    lunch_reminder_time: str = "13:00"
+    dinner_reminder_time: str = "19:00"
 
 class NutriLensProfileResponse(NutriLensProfile):
     """Response model with username included."""

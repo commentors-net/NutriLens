@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   Box,
+  Button,
   Card,
   CardContent,
   CardHeader,
@@ -16,17 +17,39 @@ import {
   TableHead,
   TableRow,
 } from '@mui/material';
-import { mealsApi, foodsApi } from '@services/api';
+import DownloadIcon from '@mui/icons-material/Download';
+import { mealsApi, foodsApi, authApi } from '@services/api';
+
+interface GoalProgress {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+}
+
+interface NutriLensProfile {
+  username: string;
+  daily_calorie_goal: number;
+  protein_goal_g: number;
+  carbs_goal_g: number;
+  fat_goal_g: number;
+  dietary_restrictions: string[];
+}
 
 interface DashboardData {
   totalFoods: number;
   totalMealsLogged: number;
   todayTotalKcal: number;
+  todayTotalProtein: number;
+  todayTotalCarbs: number;
+  todayTotalFat: number;
   todayAvgMacros: {
     protein: number;
     carbs: number;
     fat: number;
   };
+  profile: NutriLensProfile;
+  goalProgress: GoalProgress;
   recentMeals: Array<{
     date: string;
     totalKcal: number;
@@ -43,6 +66,28 @@ export default function NutriLensDashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [exportingFormat, setExportingFormat] = useState<'csv' | 'pdf' | null>(null);
+
+  const handleExportToday = async (format: 'csv' | 'pdf') => {
+    try {
+      setExportingFormat(format);
+      const today = new Date().toISOString().split('T')[0];
+      const blob = await mealsApi.exportMeals(today, today, format);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `nutrilens_today.${format}`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Dashboard export failed:', err);
+      setError(err instanceof Error ? err.message : 'Failed to export today\'s meals');
+    } finally {
+      setExportingFormat(null);
+    }
+  };
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -58,27 +103,19 @@ export default function NutriLensDashboard() {
         const todayMeals = await mealsApi.getTodayTotals();
         const todayTotalKcal = todayMeals.total_kcal || 0;
         const todayMealCount = todayMeals.meal_count || 0;
+        const todayTotalProtein = todayMeals.total_protein_g || 0;
+        const todayTotalCarbs = todayMeals.total_carbs_g || 0;
+        const todayTotalFat = todayMeals.total_fat_g || 0;
+
+        // Fetch profile goals
+        const profile = await authApi.getNutriLensProfile('nutrilens');
 
         // Calculate today's macro percentages
         let todayAvgMacros = { protein: 0, carbs: 0, fat: 0 };
-        if (todayTotalKcal > 0 && todayMeals.meals && todayMeals.meals.length > 0) {
-          let totalProtein = 0;
-          let totalCarbs = 0;
-          let totalFat = 0;
-
-          todayMeals.meals.forEach((meal: any) => {
-            if (meal.items) {
-              meal.items.forEach((item: any) => {
-                totalProtein += item.protein || 0;
-                totalCarbs += item.carbs || 0;
-                totalFat += item.fat || 0;
-              });
-            }
-          });
-
-          const proteinCals = totalProtein * 4;
-          const carbsCals = totalCarbs * 4;
-          const fatCals = totalFat * 9;
+        if (todayTotalKcal > 0) {
+          const proteinCals = todayTotalProtein * 4;
+          const carbsCals = todayTotalCarbs * 4;
+          const fatCals = todayTotalFat * 9;
           const totalMacroCals = proteinCals + carbsCals + fatCals;
 
           if (totalMacroCals > 0) {
@@ -89,6 +126,25 @@ export default function NutriLensDashboard() {
             };
           }
         }
+
+        const goalProgress: GoalProgress = {
+          calories:
+            profile.daily_calorie_goal > 0
+              ? Math.min(Math.round((todayTotalKcal / profile.daily_calorie_goal) * 100), 100)
+              : 0,
+          protein:
+            profile.protein_goal_g > 0
+              ? Math.min(Math.round((todayTotalProtein / profile.protein_goal_g) * 100), 100)
+              : 0,
+          carbs:
+            profile.carbs_goal_g > 0
+              ? Math.min(Math.round((todayTotalCarbs / profile.carbs_goal_g) * 100), 100)
+              : 0,
+          fat:
+            profile.fat_goal_g > 0
+              ? Math.min(Math.round((todayTotalFat / profile.fat_goal_g) * 100), 100)
+              : 0,
+        };
 
         // Simulate recent meals data (last 7 days)
         const recentMeals = [
@@ -115,7 +171,12 @@ export default function NutriLensDashboard() {
           totalFoods,
           totalMealsLogged: todayMealCount,
           todayTotalKcal,
+          todayTotalProtein,
+          todayTotalCarbs,
+          todayTotalFat,
           todayAvgMacros,
+          profile,
+          goalProgress,
           recentMeals,
           topFoods,
         });
@@ -155,6 +216,25 @@ export default function NutriLensDashboard() {
       <Typography variant="h4" sx={{ mb: 3, fontWeight: 'bold' }}>
         NutriLens Admin Dashboard
       </Typography>
+
+      <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap' }}>
+        <Button
+          variant="outlined"
+          startIcon={<DownloadIcon />}
+          onClick={() => handleExportToday('csv')}
+          disabled={!!exportingFormat}
+        >
+          {exportingFormat === 'csv' ? 'Exporting CSV...' : 'Export Today CSV'}
+        </Button>
+        <Button
+          variant="outlined"
+          startIcon={<DownloadIcon />}
+          onClick={() => handleExportToday('pdf')}
+          disabled={!!exportingFormat}
+        >
+          {exportingFormat === 'pdf' ? 'Exporting PDF...' : 'Export Today PDF'}
+        </Button>
+      </Box>
 
       {/* KPI Cards */}
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr 1fr' }, gap: 2, mb: 4 }}>
@@ -220,6 +300,44 @@ export default function NutriLensDashboard() {
           </CardContent>
         </Card>
       </Box>
+
+      {/* Daily Goal Progress */}
+      <Card sx={{ mb: 4 }}>
+        <CardHeader title="Daily Goal Progress" />
+        <CardContent>
+          <Box sx={{ mb: 2 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+              <Typography variant="body2">Calories ({data.todayTotalKcal} / {data.profile.daily_calorie_goal} kcal)</Typography>
+              <Typography variant="body2" sx={{ fontWeight: 'bold' }}>{data.goalProgress.calories}%</Typography>
+            </Box>
+            <LinearProgress variant="determinate" value={data.goalProgress.calories} />
+          </Box>
+
+          <Box sx={{ mb: 2 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+              <Typography variant="body2">Protein ({data.todayTotalProtein.toFixed(1)} / {data.profile.protein_goal_g} g)</Typography>
+              <Typography variant="body2" sx={{ fontWeight: 'bold' }}>{data.goalProgress.protein}%</Typography>
+            </Box>
+            <LinearProgress variant="determinate" value={data.goalProgress.protein} />
+          </Box>
+
+          <Box sx={{ mb: 2 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+              <Typography variant="body2">Carbs ({data.todayTotalCarbs.toFixed(1)} / {data.profile.carbs_goal_g} g)</Typography>
+              <Typography variant="body2" sx={{ fontWeight: 'bold' }}>{data.goalProgress.carbs}%</Typography>
+            </Box>
+            <LinearProgress variant="determinate" value={data.goalProgress.carbs} />
+          </Box>
+
+          <Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+              <Typography variant="body2">Fat ({data.todayTotalFat.toFixed(1)} / {data.profile.fat_goal_g} g)</Typography>
+              <Typography variant="body2" sx={{ fontWeight: 'bold' }}>{data.goalProgress.fat}%</Typography>
+            </Box>
+            <LinearProgress variant="determinate" value={data.goalProgress.fat} />
+          </Box>
+        </CardContent>
+      </Card>
 
       {/* Charts Row */}
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '2fr 1fr' }, gap: 2, mb: 4 }}>
