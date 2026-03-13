@@ -11,6 +11,52 @@
 
 ---
 
+## ▶ RESUME HERE — Last session: 2026-03-13 — Frontend Version Refresh + Google Auth Troubleshooting ✅
+
+**STATUS AT SESSION END (2026-03-13):**
+- ✅ Frontend now supports **new-version detection** with user notification and reload action.
+- ✅ Cloud Run CORS configuration fixed for Google Cloud Storage-hosted frontend.
+- ✅ Google Sign-In flow behavior clarified (no manual pre-registration needed).
+
+**What was completed this session:**
+1. ✅ Added production build version manifest generation:
+  - `frontend/vite.prod.config.ts` now writes `public/version.json` on each build (timestamp version).
+2. ✅ Added runtime update detection in frontend:
+  - `frontend/src/hooks/useVersionCheck.ts` polls `./version.json` every 5 minutes with `cache: no-store`.
+3. ✅ Added user-facing update banner:
+  - `frontend/src/components/UpdateBanner.tsx` shows “new version available” with **Reload now** action.
+4. ✅ Wired update banner into app shell:
+  - `frontend/src/App.tsx` now renders banner when deployed version changes.
+5. ✅ Fixed remaining login redirects to consistent route:
+  - Redirect targets standardized to `/leave-tracker/login`.
+6. ✅ Deployed frontend with cache policy:
+  - `index.html` + `version.json` → `no-cache, no-store, must-revalidate`
+  - hashed JS bundles → `public, max-age=31536000, immutable`
+7. ✅ Fixed Cloud Run CORS for hosted frontend:
+  - Updated `leave-tracker-api` env var:
+    - `CORS_ORIGINS=https://storage.googleapis.com`
+
+**Important troubleshooting notes (Google auth):**
+- **Root cause of Google login failure observed:** CORS blocked browser requests from `https://storage.googleapis.com` before auth endpoint logic could complete.
+- **Where to verify logs in GCP:**
+  1. Cloud Console → **Cloud Run** → service `leave-tracker-api` → **Logs** tab
+  2. Cloud Console → **Logging** → **Log Explorer** with filter:
+    - `resource.type="cloud_run_revision"`
+    - `resource.labels.service_name="leave-tracker-api"`
+- **User registration requirement for Google SSO:** **Not required.** Backend auto-creates user on first successful Google login (`/google-login`) if user email does not already exist.
+
+**Current production URLs:**
+- Frontend: https://storage.googleapis.com/leave-tracker-2025-frontend/index.html
+- Backend: https://leave-tracker-api-427212681311.us-central1.run.app
+
+**Immediate verification checklist (post-deploy):**
+1. Open frontend in incognito and hard refresh (`Ctrl+Shift+R`).
+2. Confirm Login route resolves as hash URL (`#/leave-tracker/login`).
+3. Attempt Google Sign-In and inspect Cloud Run logs for `/leave-tracker/auth/google-login`.
+4. Keep one tab open during a later deploy and verify update banner appears within 5 minutes.
+
+---
+
 ## ▶ RESUME HERE — Last session: 2026-03-08 (Evening) — P4.1 & P4.2 DEPLOYED TO CLOUD ✅
 
 **STATUS AT SESSION END (2026-03-08 Evening):**
