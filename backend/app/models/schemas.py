@@ -69,6 +69,9 @@ class MealItem(BaseModel):
     label: str
     grams: int
     macros: Macros
+    original_label: Optional[str] = None
+    original_grams: Optional[int] = None
+    corrected: bool = False
 
 
 class SaveMealRequest(BaseModel):

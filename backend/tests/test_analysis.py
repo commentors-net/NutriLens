@@ -1,9 +1,7 @@
-"""
-Unit tests for analysis service.
-"""
+"""Unit tests for analysis service."""
 
 import pytest
-from app.services.analysis import analyze_images_deterministic
+from app.services.analysis import analyze_images_deterministic, build_analysis_response_from_ai_payload
 
 
 @pytest.mark.asyncio
@@ -51,3 +49,37 @@ async def test_analyze_no_images_error():
     """Test that empty image list raises error"""
     with pytest.raises(ValueError):
         await analyze_images_deterministic([], {})
+
+
+def test_build_analysis_response_from_ai_payload_normalizes_values():
+    payload = {
+        "overall_confidence": 1.5,
+        "needs_more_photos": False,
+        "suggested_next_shots": ["top_down", "invalid_shot", "closeup", "closeup"],
+        "items": [
+            {
+                "label": "mystery bowl",
+                "label_confidence": -0.3,
+                "grams_estimate": 120,
+                "grams_range": {"min": 200, "max": 50},
+                "grams_confidence": 5,
+            }
+        ],
+        "warnings": [" uncertain ", "", "uncertain"],
+    }
+
+    result = build_analysis_response_from_ai_payload(payload, image_count=3)
+
+    assert result.overall_confidence == 1.0
+    assert result.needs_more_photos is False
+    assert result.suggested_next_shots == ["top_down", "closeup"]
+    assert result.items[0].label_confidence == 0.0
+    assert result.items[0].grams_confidence == 1.0
+    assert result.items[0].grams_range.min == 200
+    assert result.items[0].grams_range.max == 200
+    assert any(warning.startswith("nutrition_db_unmatched") for warning in result.warnings)
+
+
+def test_build_analysis_response_from_ai_payload_requires_items():
+    with pytest.raises(ValueError):
+        build_analysis_response_from_ai_payload({"items": []}, image_count=5)

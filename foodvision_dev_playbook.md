@@ -11,6 +11,93 @@
 
 ---
 
+## ▶ RESUME HERE — Last session: 2026-03-13 — Correction Tuning Logs Live ✅
+
+**STATUS AT SESSION END (2026-03-13):**
+- ✅ Correction logging for AI tuning is implemented and deployed.
+- ✅ New backend endpoint available: `/meals/corrections` (and `/nutrilens/meals/corrections`).
+- ✅ End-to-end live verification succeeded: corrected meal save now writes correction events.
+
+**What was completed this session:**
+1. ✅ Added correction log persistence in backend DB layers:
+  - `backend/app/db/sqlite_db_cloud.py`
+    - Added `meal_corrections` table.
+    - Added `save_corrections(...)` and `get_corrections(...)`.
+  - `backend/app/db/firestore_db.py`
+    - Added collection `nutrilens_meal_corrections`.
+    - Added `save_corrections(...)` and `get_corrections(...)`.
+2. ✅ Added correction retrieval API:
+  - `backend/app/api/routes_meals.py`
+    - Added `GET /meals/corrections` (+ namespaced alias).
+3. ✅ Linked correction logging to meal save flow:
+  - `POST /meals` now emits correction events for edited items (`corrected=true`) and returns `correction_count`.
+4. ✅ Fixed production save regression:
+  - Root cause: `MealItem` has no `item_id` field, causing 500 in correction logging path.
+  - Fix: use safe fallback (`getattr(item, "item_id", None)`) in correction-event creation.
+5. ✅ Deployed and verified in production:
+  - Active revision: `nutrilens-api-00015-6r5`.
+  - `POST /meals` with corrected item → success with `correction_count=1`.
+  - `GET /meals/corrections?limit=5` shows latest correction event.
+  - `GET /meals/range` and `GET /meals/export?format=csv` remain healthy.
+
+**Current Milestone Status (M4):**
+- ✅ AI output normalization hardening
+- ✅ User correction/edit loop
+- ✅ Correction metadata persistence on meals
+- ✅ Correction tuning logs (queryable)
+- ⏳ Remaining: migrate from deprecated `google.generativeai` to `google.genai`; add aggregated correction analytics/reporting layer.
+
+---
+
+## ▶ RESUME HERE — Last session: 2026-03-13 — Deploy Complete + Real Dashboard Data + AI Analysis Started ✅
+
+**STATUS AT SESSION END (2026-03-13):**
+- ✅ Unified backend redeployed to Cloud Run.
+- ✅ Frontend redeployed to Cloud Storage against the unified backend.
+- ✅ NutriLens dashboard now uses real 7-day meal aggregation instead of simulated data.
+- ✅ Milestone 4 has been started with an optional real Gemini-based analysis path.
+
+**What was completed this session:**
+1. ✅ Deployed backend update:
+  - Cloud Run service: `nutrilens-api`
+  - Active URL confirmed: `https://nutrilens-api-2ajzj2dbrq-uc.a.run.app`
+2. ✅ Deployed frontend update:
+  - Frontend URL: `https://storage.googleapis.com/leave-tracker-2025-frontend/index.html`
+  - Production frontend now points to the unified backend URL above.
+3. ✅ Replaced dashboard mock data with real aggregation:
+  - `frontend/src/pages/NutriLensDashboard.tsx` now loads real 7-day meal totals.
+  - Top foods now come from actual logged meal items instead of randomized counts.
+4. ✅ Improved meal endpoint usefulness:
+  - `backend/app/api/routes_meals.py` now includes item details and notes in `/meals/today` and `/meals/range` responses.
+  - `/meals/today` now supports optional `?date=YYYY-MM-DD` filtering.
+5. ✅ Started Milestone 4 real AI integration:
+  - `backend/app/services/analysis.py` now tries Gemini multimodal analysis when `GEMINI_API_KEY` is configured.
+  - If Gemini is unavailable or fails, the service falls back to deterministic mock analysis.
+  - Added env config documentation in `backend/.env.example`.
+6. ✅ Deployment/script cleanup:
+  - `deploy-leave-tracker-frontend.ps1` was repaired and updated to upload `version.json` and set cache-control for `index.html`, `version.json`, and hashed assets.
+
+**Current Phase Status:**
+- Phase P4: complete
+- Milestone 4: started, not complete
+
+**Important technical note:**
+- The current Gemini implementation uses `google.generativeai`, which is already present in the repo but emits a deprecation warning.
+- Future follow-up should migrate NutriLens analysis from `google.generativeai` to `google.genai`.
+
+**Recommended next implementation options:**
+1. Continue Milestone 4:
+  - Improve prompt/output validation for Gemini meal analysis.
+  - Add correction/edit loop for detected labels and grams.
+  - Log AI-vs-user corrections for future tuning.
+2. Improve production verification:
+  - Verify login, NutriLens dashboard, export, and reminders on the deployed frontend.
+  - Confirm `/meals/range` works in production after Firestore index creation.
+3. Begin Phase P5 cleanup:
+  - Expand NutriLens admin UI beyond current dashboard/history/profile/export coverage.
+
+---
+
 ## ▶ RESUME HERE — Last session: 2026-03-13 — Phase P4 Complete ✅
 
 **STATUS AT SESSION END (2026-03-13):**

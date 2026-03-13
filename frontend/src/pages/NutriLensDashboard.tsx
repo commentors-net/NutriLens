@@ -53,12 +53,12 @@ interface DashboardData {
   recentMeals: Array<{
     date: string;
     totalKcal: number;
-    itemCount: number;
+    mealCount: number;
   }>;
   topFoods: Array<{
     name: string;
     count: number;
-    kcal: number;
+    totalKcal: number;
   }>;
 }
 
@@ -95,12 +95,19 @@ export default function NutriLensDashboard() {
         setLoading(true);
         setError(null);
 
+        const today = new Date();
+        const startDate = new Date(today);
+        startDate.setDate(startDate.getDate() - 6);
+        const todayStr = today.toISOString().split('T')[0];
+        const startDateStr = startDate.toISOString().split('T')[0];
+
         // Fetch foods count
         const foods = await foodsApi.listAll();
         const totalFoods = foods.length;
 
         // Fetch today's meal totals
         const todayMeals = await mealsApi.getTodayTotals();
+        const recentRangeMeals = await mealsApi.getMealsByRange(startDateStr, todayStr);
         const todayTotalKcal = todayMeals.total_kcal || 0;
         const todayMealCount = todayMeals.meal_count || 0;
         const todayTotalProtein = todayMeals.total_protein_g || 0;
@@ -146,26 +153,41 @@ export default function NutriLensDashboard() {
               : 0,
         };
 
-        // Simulate recent meals data (last 7 days)
-        const recentMeals = [
-          { date: 'Today', totalKcal: todayTotalKcal, itemCount: todayMealCount },
-          { date: 'Yesterday', totalKcal: 2100, itemCount: 3 },
-          { date: '-2d', totalKcal: 2350, itemCount: 4 },
-          { date: '-3d', totalKcal: 1950, itemCount: 3 },
-          { date: '-4d', totalKcal: 2200, itemCount: 3 },
-          { date: '-5d', totalKcal: 2050, itemCount: 2 },
-          { date: '-6d', totalKcal: 2400, itemCount: 4 },
-        ];
+        const recentMealsMap = new Map<string, { date: string; totalKcal: number; mealCount: number }>();
+        for (let offset = 0; offset < 7; offset += 1) {
+          const bucketDate = new Date(startDate);
+          bucketDate.setDate(startDate.getDate() + offset);
+          const dateKey = bucketDate.toISOString().split('T')[0];
+          recentMealsMap.set(dateKey, { date: dateKey, totalKcal: 0, mealCount: 0 });
+        }
 
-        // Simulate top foods (would normally be computed from meals data)
-        const topFoods = foods
-          .sort((a: any, b: any) => (b.kcal_per_100g || 0) - (a.kcal_per_100g || 0))
-          .slice(0, 5)
-          .map((food: any) => ({
-            name: food.name,
-            count: Math.floor(Math.random() * 10) + 1,
-            kcal: food.kcal_per_100g || 0,
-          }));
+        const topFoodsMap = new Map<string, { name: string; count: number; totalKcal: number }>();
+        (recentRangeMeals.meals || []).forEach((meal: any) => {
+          const dateKey = String(meal.timestamp || '').split('T')[0];
+          const dayBucket = recentMealsMap.get(dateKey);
+          if (dayBucket) {
+            dayBucket.totalKcal += meal.total_kcal || 0;
+            dayBucket.mealCount += 1;
+          }
+
+          (meal.items || []).forEach((item: any) => {
+            const label = item.label || 'Unknown';
+            const existing = topFoodsMap.get(label) || { name: label, count: 0, totalKcal: 0 };
+            existing.count += 1;
+            existing.totalKcal += item.kcal || 0;
+            topFoodsMap.set(label, existing);
+          });
+        });
+
+        const recentMeals = Array.from(recentMealsMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+        const topFoods = Array.from(topFoodsMap.values())
+          .sort((a, b) => {
+            if (b.count !== a.count) {
+              return b.count - a.count;
+            }
+            return b.totalKcal - a.totalKcal;
+          })
+          .slice(0, 5);
 
         setData({
           totalFoods,
@@ -357,9 +379,9 @@ export default function NutriLensDashboard() {
                 <TableBody>
                   {data.recentMeals.map((meal, index) => (
                     <TableRow key={index}>
-                      <TableCell>{meal.date}</TableCell>
+                      <TableCell>{new Date(meal.date).toLocaleDateString([], { month: 'short', day: 'numeric' })}</TableCell>
                       <TableCell align="right">{meal.totalKcal}</TableCell>
-                      <TableCell align="right">{meal.itemCount}</TableCell>
+                      <TableCell align="right">{meal.mealCount}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -407,7 +429,7 @@ export default function NutriLensDashboard() {
 
       {/* Top Foods Table */}
       <Card>
-        <CardHeader title="Top Foods (by caloric density)" />
+        <CardHeader title="Top Foods (last 7 days)" />
         <CardContent>
           {data.topFoods.length > 0 ? (
             <TableContainer>
@@ -416,7 +438,7 @@ export default function NutriLensDashboard() {
                   <TableRow>
                     <TableCell>Food Name</TableCell>
                     <TableCell align="right">Times Logged</TableCell>
-                    <TableCell align="right">kcal per 100g</TableCell>
+                    <TableCell align="right">Consumed kcal</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -424,7 +446,7 @@ export default function NutriLensDashboard() {
                     <TableRow key={index}>
                       <TableCell>{food.name}</TableCell>
                       <TableCell align="right">{food.count}</TableCell>
-                      <TableCell align="right">{food.kcal}</TableCell>
+                      <TableCell align="right">{food.totalKcal}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

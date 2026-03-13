@@ -1,4 +1,4 @@
-# Deploy Leave Tracker frontend from unified NutriLens repository root
+# Deploy unified frontend from the NutriLens repository root.
 param(
     [string]$ProjectId = "leave-tracker-2025",
     [string]$BucketName = "leave-tracker-2025-frontend",
@@ -8,11 +8,11 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-Write-Host "`n🚀 Deploying Leave Tracker Frontend from unified repo" -ForegroundColor Cyan
-Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`n" -ForegroundColor Gray
+Write-Host "`nDeploying frontend from unified repo" -ForegroundColor Cyan
+Write-Host "-----------------------------------`n" -ForegroundColor Gray
 
 $frontendPath = "frontend"
-if (!(Test-Path $frontendPath)) {
+if (-not (Test-Path $frontendPath)) {
     Write-Host "ERROR: Frontend folder not found: $frontendPath" -ForegroundColor Red
     exit 1
 }
@@ -27,28 +27,45 @@ Push-Location $frontendPath
 npm install
 npm run build:prod
 Pop-Location
-Write-Host "✓ Build successful`n" -ForegroundColor Green
+Write-Host "Build successful.`n" -ForegroundColor Green
 
 Write-Host "Step 2/4: Optional clean..." -ForegroundColor Yellow
 if ($CleanBucket.IsPresent) {
-    gcloud storage rm -r gs://$BucketName/* --project=$ProjectId 2>$null
-    Write-Host "✓ Bucket cleaned`n" -ForegroundColor Green
+    gcloud storage rm -r "gs://$BucketName/*" --project=$ProjectId 2>$null
+    Write-Host "Bucket cleaned.`n" -ForegroundColor Green
 } else {
-    Write-Host "✓ Skip clean (use -CleanBucket to enable)`n" -ForegroundColor Green
+    Write-Host "Skip clean (use -CleanBucket to enable).`n" -ForegroundColor Green
 }
 
 Write-Host "Step 3/4: Uploading build output..." -ForegroundColor Yellow
 gcloud storage cp "$frontendPath/dist/index.html" "gs://$BucketName/" --project=$ProjectId
-gcloud storage cp -r "$frontendPath/dist/assets" "gs://$BucketName/" --project=$ProjectId
+if (Test-Path "$frontendPath/dist/version.json") {
+    gcloud storage cp "$frontendPath/dist/version.json" "gs://$BucketName/" --project=$ProjectId
+}
+if (Test-Path "$frontendPath/dist/assets") {
+    gcloud storage cp -r "$frontendPath/dist/assets" "gs://$BucketName/" --project=$ProjectId
+}
 if (Test-Path "$frontendPath/dist/public") {
     gcloud storage cp -r "$frontendPath/dist/public" "gs://$BucketName/" --project=$ProjectId
 }
-Write-Host "✓ Upload successful`n" -ForegroundColor Green
+Write-Host "Upload successful.`n" -ForegroundColor Green
 
-Write-Host "Step 4/4: Setting cache-control for index.html..." -ForegroundColor Yellow
+Write-Host "Step 4/4: Setting cache-control..." -ForegroundColor Yellow
 gcloud storage objects update "gs://$BucketName/index.html" `
     --cache-control="no-cache, no-store, must-revalidate" `
     --project=$ProjectId
 
-Write-Host "`n✅ Leave Tracker frontend deployed." -ForegroundColor Green
+if (Test-Path "$frontendPath/dist/version.json") {
+    gcloud storage objects update "gs://$BucketName/version.json" `
+        --cache-control="no-cache, no-store, must-revalidate" `
+        --project=$ProjectId
+}
+
+if (Test-Path "$frontendPath/dist/assets") {
+    gcloud storage objects update "gs://$BucketName/assets/**" `
+        --cache-control="public, max-age=31536000, immutable" `
+        --project=$ProjectId
+}
+
+Write-Host "`nFrontend deployment completed." -ForegroundColor Green
 Write-Host "URL: https://storage.googleapis.com/$BucketName/index.html" -ForegroundColor Cyan

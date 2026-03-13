@@ -148,7 +148,17 @@ class _ResultsView extends ConsumerWidget {
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 8),
-        ...response.items.map((item) => _ItemCard(item: item)),
+        ...response.items.asMap().entries.map(
+          (entry) => _ItemCard(
+            item: entry.value,
+            onEdit: () => _showEditItemDialog(
+              context,
+              ref,
+              entry.key,
+              entry.value,
+            ),
+          ),
+        ),
 
         // Warnings
         if (response.warnings.isNotEmpty) ...[
@@ -195,6 +205,23 @@ class _ResultsView extends ConsumerWidget {
       ],
     );
   }
+}
+
+void _showEditItemDialog(
+  BuildContext context,
+  WidgetRef ref,
+  int index,
+  AnalyzeItem item,
+) {
+  showDialog<void>(
+    context: context,
+    builder: (context) => _EditAnalyzeItemDialog(
+      item: item,
+      onSave: (updatedItem) {
+        ref.read(analysisProvider.notifier).updateItem(index, updatedItem);
+      },
+    ),
+  );
 }
 
 // ─── Confidence Banner ────────────────────────────────────────────────────────
@@ -299,7 +326,8 @@ class _MacroChip extends StatelessWidget {
 
 class _ItemCard extends StatelessWidget {
   final AnalyzeItem item;
-  const _ItemCard({required this.item});
+  final VoidCallback onEdit;
+  const _ItemCard({required this.item, required this.onEdit});
 
   @override
   Widget build(BuildContext context) {
@@ -314,11 +342,26 @@ class _ItemCard extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                  child: Text(
-                    item.label,
-                    style: const TextStyle(
-                        fontSize: 15, fontWeight: FontWeight.w600),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.label,
+                        style: const TextStyle(
+                            fontSize: 15, fontWeight: FontWeight.w600),
+                      ),
+                      if (item.isCorrected)
+                        Text(
+                          'Edited from ${item.originalLabel} (${item.originalGramsEstimate}g)',
+                          style: const TextStyle(fontSize: 12, color: Colors.green),
+                        ),
+                    ],
                   ),
+                ),
+                IconButton(
+                  onPressed: onEdit,
+                  icon: const Icon(Icons.edit_outlined),
+                  tooltip: 'Edit item',
                 ),
                 Container(
                   padding:
@@ -364,6 +407,97 @@ class _ItemCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _EditAnalyzeItemDialog extends StatefulWidget {
+  final AnalyzeItem item;
+  final ValueChanged<AnalyzeItem> onSave;
+
+  const _EditAnalyzeItemDialog({required this.item, required this.onSave});
+
+  @override
+  State<_EditAnalyzeItemDialog> createState() => _EditAnalyzeItemDialogState();
+}
+
+class _EditAnalyzeItemDialogState extends State<_EditAnalyzeItemDialog> {
+  late final TextEditingController _labelController;
+  late final TextEditingController _gramsController;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _labelController = TextEditingController(text: widget.item.label);
+    _gramsController = TextEditingController(
+      text: widget.item.gramsEstimate.toString(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _labelController.dispose();
+    _gramsController.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    final label = _labelController.text.trim();
+    final grams = int.tryParse(_gramsController.text.trim());
+    if (label.isEmpty || grams == null || grams <= 0) {
+      setState(() {
+        _error = 'Enter a valid label and grams value.';
+      });
+      return;
+    }
+
+    final delta = grams - widget.item.gramsEstimate;
+    final updated = widget.item.copyWith(
+      label: label,
+      gramsEstimate: grams,
+      gramsRange: widget.item.gramsRange.copyWith(
+        min: (widget.item.gramsRange.min + delta).clamp(1, 10000),
+        max: (widget.item.gramsRange.max + delta).clamp(1, 10000),
+      ),
+    );
+    widget.onSave(updated);
+    Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Edit detected item'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _labelController,
+            decoration: const InputDecoration(labelText: 'Food label'),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _gramsController,
+            decoration: const InputDecoration(labelText: 'Grams'),
+            keyboardType: TextInputType.number,
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 12),
+            Text(_error!, style: const TextStyle(color: Colors.red)),
+          ],
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _save,
+          child: const Text('Apply'),
+        ),
+      ],
     );
   }
 }

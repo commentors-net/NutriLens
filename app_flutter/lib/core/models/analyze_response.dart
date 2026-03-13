@@ -28,6 +28,22 @@ class AnalyzeMealResponse {
     );
   }
 
+  AnalyzeMealResponse copyWith({
+    double? overallConfidence,
+    bool? needsMorePhotos,
+    List<String>? suggestedNextShots,
+    List<AnalyzeItem>? items,
+    List<String>? warnings,
+  }) {
+    return AnalyzeMealResponse(
+      overallConfidence: overallConfidence ?? this.overallConfidence,
+      needsMorePhotos: needsMorePhotos ?? this.needsMorePhotos,
+      suggestedNextShots: suggestedNextShots ?? this.suggestedNextShots,
+      items: items ?? this.items,
+      warnings: warnings ?? this.warnings,
+    );
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'overall_confidence': overallConfidence,
@@ -47,6 +63,8 @@ class AnalyzeItem {
   final GramsRange gramsRange;
   final double gramsConfidence;
   final Macros macros;
+  final String originalLabel;
+  final int originalGramsEstimate;
 
   AnalyzeItem({
     required this.itemId,
@@ -56,6 +74,8 @@ class AnalyzeItem {
     required this.gramsRange,
     required this.gramsConfidence,
     required this.macros,
+    required this.originalLabel,
+    required this.originalGramsEstimate,
   });
 
   factory AnalyzeItem.fromJson(Map<String, dynamic> json) {
@@ -67,6 +87,35 @@ class AnalyzeItem {
       gramsRange: GramsRange.fromJson(json['grams_range'] as Map<String, dynamic>),
       gramsConfidence: (json['grams_confidence'] as num).toDouble(),
       macros: Macros.fromJson(json['macros'] as Map<String, dynamic>),
+      originalLabel: json['original_label'] as String? ?? json['label'] as String,
+      originalGramsEstimate:
+          json['original_grams_estimate'] as int? ?? json['grams_estimate'] as int,
+    );
+  }
+
+  bool get isCorrected =>
+      label != originalLabel || gramsEstimate != originalGramsEstimate;
+
+  AnalyzeItem copyWith({
+    String? label,
+    double? labelConfidence,
+    int? gramsEstimate,
+    GramsRange? gramsRange,
+    double? gramsConfidence,
+    Macros? macros,
+    String? originalLabel,
+    int? originalGramsEstimate,
+  }) {
+    return AnalyzeItem(
+      itemId: itemId,
+      label: label ?? this.label,
+      labelConfidence: labelConfidence ?? this.labelConfidence,
+      gramsEstimate: gramsEstimate ?? this.gramsEstimate,
+      gramsRange: gramsRange ?? this.gramsRange,
+      gramsConfidence: gramsConfidence ?? this.gramsConfidence,
+      macros: macros ?? this.macros,
+      originalLabel: originalLabel ?? this.originalLabel,
+      originalGramsEstimate: originalGramsEstimate ?? this.originalGramsEstimate,
     );
   }
 
@@ -79,6 +128,8 @@ class AnalyzeItem {
       'grams_range': gramsRange.toJson(),
       'grams_confidence': gramsConfidence,
       'macros': macros.toJson(),
+      'original_label': originalLabel,
+      'original_grams_estimate': originalGramsEstimate,
     };
   }
 }
@@ -93,6 +144,13 @@ class GramsRange {
     return GramsRange(
       min: json['min'] as int,
       max: json['max'] as int,
+    );
+  }
+
+  GramsRange copyWith({int? min, int? max}) {
+    return GramsRange(
+      min: min ?? this.min,
+      max: max ?? this.max,
     );
   }
 
@@ -120,6 +178,20 @@ class Macros {
       proteinG: (json['protein_g'] as num).toDouble(),
       carbsG: (json['carbs_g'] as num).toDouble(),
       fatG: (json['fat_g'] as num).toDouble(),
+    );
+  }
+
+  Macros copyWith({
+    int? kcal,
+    double? proteinG,
+    double? carbsG,
+    double? fatG,
+  }) {
+    return Macros(
+      kcal: kcal ?? this.kcal,
+      proteinG: proteinG ?? this.proteinG,
+      carbsG: carbsG ?? this.carbsG,
+      fatG: fatG ?? this.fatG,
     );
   }
 

@@ -22,6 +22,7 @@ from google.cloud import firestore
 class NutriLensFirestoreDB:
     FOODS = "nutrilens_foods"
     MEALS = "nutrilens_meals"
+    CORRECTIONS = "nutrilens_meal_corrections"
 
     def __init__(self) -> None:
         project_id = os.getenv("GCP_PROJECT_ID", "leave-tracker-2025")
@@ -155,10 +156,50 @@ class NutriLensFirestoreDB:
             self.db.collection(self.MEALS)
             .where("date_str", ">=", start_date)
             .where("date_str", "<=", end_date)
-            .order_by("timestamp", direction="DESCENDING")
             .stream()
         )
-        return [{"id": d.id, **d.to_dict()} for d in docs]
+        meals = [{"id": d.id, **d.to_dict()} for d in docs]
+        meals.sort(key=lambda meal: meal.get("timestamp", ""), reverse=True)
+        return meals
+
+    def save_corrections(self, corrections: List[Dict[str, Any]]) -> int:
+        if not corrections:
+            return 0
+
+        batch = self.db.batch()
+        inserted = 0
+
+        for correction in corrections:
+            correction_id = correction.get("correction_id")
+            if not correction_id:
+                continue
+
+            ref = self.db.collection(self.CORRECTIONS).document(correction_id)
+            batch.set(ref, correction)
+            inserted += 1
+
+        if inserted:
+            batch.commit()
+
+        return inserted
+
+    def get_corrections(
+        self,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        limit: int = 100,
+    ) -> List[Dict[str, Any]]:
+        query = self.db.collection(self.CORRECTIONS)
+
+        if start_date:
+            query = query.where("date_str", ">=", start_date)
+        if end_date:
+            query = query.where("date_str", "<=", end_date)
+
+        docs = query.limit(limit).stream()
+        corrections = [{"id": d.id, **d.to_dict()} for d in docs]
+        corrections.sort(key=lambda entry: entry.get("timestamp", ""), reverse=True)
+        return corrections
 
 
 # Lazy singleton — only instantiate when actually needed (i.e., when ENVIRONMENT != development)

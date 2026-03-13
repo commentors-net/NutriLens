@@ -81,6 +81,9 @@ class FoodVisionClient {
           .map((item) => {
                 'label': item.label,
                 'grams': item.gramsEstimate,
+                'original_label': item.originalLabel,
+                'original_grams': item.originalGramsEstimate,
+                'corrected': item.isCorrected,
                 'macros': {
                   'kcal': item.macros.kcal,
                   'protein_g': item.macros.proteinG,

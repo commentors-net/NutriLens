@@ -51,6 +51,19 @@ class NutriLensSQLiteDB:
                 notes     TEXT DEFAULT '',
                 items     TEXT DEFAULT '[]'
             );
+
+            CREATE TABLE IF NOT EXISTS meal_corrections (
+                correction_id   TEXT PRIMARY KEY,
+                meal_id         TEXT NOT NULL,
+                timestamp       TEXT NOT NULL,
+                date_str        TEXT NOT NULL,
+                item_id         TEXT,
+                corrected_label TEXT NOT NULL,
+                corrected_grams INTEGER NOT NULL,
+                original_label  TEXT,
+                original_grams  INTEGER,
+                grams_delta     INTEGER NOT NULL
+            );
         """)
         conn.commit()
         conn.close()
@@ -249,6 +262,77 @@ class NutriLensSQLiteDB:
             meal["items"] = json.loads(meal.get("items", "[]"))
             result.append(meal)
         return result
+
+    def save_corrections(self, corrections: List[Dict[str, Any]]) -> int:
+        if not corrections:
+            return 0
+
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        inserted = 0
+
+        for correction in corrections:
+            correction_id = correction.get("correction_id") or str(uuid.uuid4())
+            timestamp = correction.get("timestamp") or datetime.utcnow().isoformat()
+            date_str = correction.get("date_str") or timestamp[:10]
+
+            cursor.execute(
+                """
+                INSERT INTO meal_corrections (
+                    correction_id, meal_id, timestamp, date_str, item_id,
+                    corrected_label, corrected_grams, original_label, original_grams, grams_delta
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    correction_id,
+                    correction.get("meal_id", ""),
+                    timestamp,
+                    date_str,
+                    correction.get("item_id"),
+                    correction.get("corrected_label", ""),
+                    int(correction.get("corrected_grams", 0)),
+                    correction.get("original_label"),
+                    correction.get("original_grams"),
+                    int(correction.get("grams_delta", 0)),
+                ),
+            )
+            inserted += 1
+
+        conn.commit()
+        conn.close()
+        return inserted
+
+    def get_corrections(
+        self,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        limit: int = 100,
+    ) -> List[Dict[str, Any]]:
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        query = "SELECT * FROM meal_corrections"
+        params: List[Any] = []
+        filters: List[str] = []
+
+        if start_date:
+            filters.append("date_str >= ?")
+            params.append(start_date)
+        if end_date:
+            filters.append("date_str <= ?")
+            params.append(end_date)
+
+        if filters:
+            query += " WHERE " + " AND ".join(filters)
+
+        query += " ORDER BY timestamp DESC LIMIT ?"
+        params.append(limit)
+
+        cursor.execute(query, tuple(params))
+        rows = cursor.fetchall()
+        conn.close()
+
+        return [dict(row) for row in rows]
 
 
 # Global singleton

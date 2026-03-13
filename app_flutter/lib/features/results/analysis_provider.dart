@@ -32,6 +32,17 @@ class AnalysisNotifier extends StateNotifier<AsyncValue<AnalyzeMealResponse?>> {
     }
   }
 
+  void updateItem(int index, AnalyzeItem updatedItem) {
+    final current = state.valueOrNull;
+    if (current == null || index < 0 || index >= current.items.length) {
+      return;
+    }
+
+    final updatedItems = [...current.items];
+    updatedItems[index] = updatedItem;
+    state = AsyncValue.data(current.copyWith(items: updatedItems));
+  }
+
   void reset() => state = const AsyncValue.data(null);
 }
 

@@ -24,7 +24,7 @@ from app.models.schemas import (
     MealTotalResponse,
     SaveMealRequest,
 )
-from app.services.analysis import analyze_images_deterministic
+from app.services.analysis import analyze_images
 from app.services.nutrition import get_food_fuzzy, compute_macros_from_food
 
 router = APIRouter()
@@ -64,7 +64,7 @@ async def analyze_meal(
     image_bytes = [await img.read() for img in images]
 
     try:
-        analysis = await analyze_images_deterministic(image_bytes, meta_dict)
+        analysis = await analyze_images(image_bytes, meta_dict)
         return analysis
     except Exception as e:
         logger.error(f"Analysis failed: {e}")
@@ -86,6 +86,7 @@ async def save_meal(request: SaveMealRequest):
     timestamp = (request.timestamp or datetime.utcnow()).isoformat()
 
     embedded_items: List[dict] = []
+    correction_events: List[dict] = []
     total_kcal = 0
     unmatched: List[str] = []
 
@@ -107,12 +108,36 @@ async def save_meal(request: SaveMealRequest):
             food_id = food.get("food_id", "unknown")
 
         total_kcal += macros["kcal"]
-        embedded_items.append({
+        embedded_item = {
             "food_id": food_id,
             "label": item.label,
             "grams": item.grams,
             **macros,
-        })
+        }
+
+        if item.original_label is not None:
+            embedded_item["original_label"] = item.original_label
+        if item.original_grams is not None:
+            embedded_item["original_grams"] = item.original_grams
+        if item.corrected:
+            embedded_item["corrected"] = True
+
+            corrected_grams = int(item.grams)
+            original_grams = int(item.original_grams or item.grams)
+            correction_events.append({
+                "correction_id": str(uuid.uuid4()),
+                "meal_id": meal_id,
+                "timestamp": timestamp,
+                "date_str": timestamp[:10],
+                "item_id": getattr(item, "item_id", None),
+                "corrected_label": item.label,
+                "corrected_grams": corrected_grams,
+                "original_label": item.original_label or item.label,
+                "original_grams": original_grams,
+                "grams_delta": corrected_grams - original_grams,
+            })
+
+        embedded_items.append(embedded_item)
 
     db.save_meal(
         meal_id=meal_id,
@@ -121,26 +146,63 @@ async def save_meal(request: SaveMealRequest):
         items=embedded_items,
     )
 
+    correction_count = 0
+    if correction_events and hasattr(db, "save_corrections"):
+        try:
+            correction_count = db.save_corrections(correction_events)
+        except Exception as e:
+            logger.warning(f"Failed to persist correction events for meal_id={meal_id}: {e}")
+
     return {
         "meal_id": meal_id,
         "timestamp": timestamp,
         "item_count": len(request.items),
         "total_kcal": total_kcal,
+        "correction_count": correction_count,
         "unmatched_labels": unmatched,
         "status": "saved",
     }
 
 
+@router.get("/corrections")
+async def get_meal_corrections(
+    start: Optional[str] = None,
+    end: Optional[str] = None,
+    limit: int = 100,
+):
+    if start:
+        _parse_date(start)
+    if end:
+        _parse_date(end)
+    if start and end and start > end:
+        raise HTTPException(status_code=400, detail="start date must be on or before end date")
+
+    bounded_limit = max(1, min(limit, 500))
+
+    if not hasattr(db, "get_corrections"):
+        return {
+            "count": 0,
+            "corrections": [],
+        }
+
+    corrections = db.get_corrections(start_date=start, end_date=end, limit=bounded_limit)
+    return {
+        "count": len(corrections),
+        "corrections": corrections,
+    }
+
+
 @router.get("/today", response_model=MealTotalResponse)
-async def get_meals_today():
+async def get_meals_today(date: Optional[str] = None):
     """
     GET /meals/today
 
     Returns totals for all meals saved today (UTC date).
     Reads embedded item macros — no re-join needed.
     """
-    today_str = date.today().isoformat()  # "YYYY-MM-DD"
-    meals = db.get_meals_by_date(today_str)
+    target_date = date or datetime.utcnow().date().isoformat()  # "YYYY-MM-DD"
+    _parse_date(target_date)
+    meals = db.get_meals_by_date(target_date)
 
     total_kcal = 0
     total_protein = 0.0
@@ -159,6 +221,8 @@ async def get_meals_today():
             "timestamp": meal.get("timestamp"),
             "item_count": len(meal.get("items", [])),
             "total_kcal": meal_kcal,
+            "items": meal.get("items", []),
+            "notes": meal.get("notes", ""),
         })
 
     return MealTotalResponse(
@@ -198,6 +262,8 @@ async def get_meals_by_range(start: str, end: str):
             "timestamp": meal.get("timestamp"),
             "item_count": len(meal.get("items", [])),
             "total_kcal": meal_kcal,
+            "items": meal.get("items", []),
+            "notes": meal.get("notes", ""),
         })
 
     return MealTotalResponse(

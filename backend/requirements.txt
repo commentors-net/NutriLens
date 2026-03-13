@@ -19,3 +19,4 @@ passlib[bcrypt]
 google-generativeai
 google-auth
 reportlab==4.2.5
+chardet<6
