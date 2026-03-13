@@ -176,6 +176,7 @@ $RECYCLE.BIN/
 local_temp/
 *.sqlite
 *.sqlite3
+*.bin
 
 # Build outputs
 /build/
@@ -214,3 +215,4 @@ local_temp/
 *.gif
 temp/
 app_flutter/android/app/google-services.json
+/android/app/.cxx

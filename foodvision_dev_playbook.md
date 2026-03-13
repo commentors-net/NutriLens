@@ -47,6 +47,16 @@
 - ✅ Correction tuning logs (queryable)
 - ⏳ Remaining: migrate from deprecated `google.generativeai` to `google.genai`; add aggregated correction analytics/reporting layer.
 
+**Next Session Implementation (confirmed):**
+1. 🔄 Migrate AI SDK from deprecated `google.generativeai` to `google.genai`.
+  - Replace client initialization and model invocation in `backend/app/services/analysis.py`.
+  - Keep deterministic fallback path unchanged.
+  - Revalidate `POST /meals/analyze` behavior in deployed environment.
+2. 🔄 Add correction analytics endpoint/reporting for tuning feedback loops.
+  - Add aggregated analytics from correction logs: top corrected labels, average grams delta, correction frequency.
+  - Expose endpoint under meals routes (e.g., `/meals/corrections/analytics` + namespaced alias).
+  - Verify against live correction data and document expected payload in playbook after deployment.
+
 ---
 
 ## ▶ RESUME HERE — Last session: 2026-03-13 — Deploy Complete + Real Dashboard Data + AI Analysis Started ✅
