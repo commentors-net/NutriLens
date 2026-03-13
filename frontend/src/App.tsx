@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Link, useNavigate, Navigate } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Link, useNavigate, Navigate } from 'react-router-dom';
 import { 
   AppBar, 
   Toolbar, 
@@ -18,6 +18,8 @@ import {
 import MenuIcon from '@mui/icons-material/Menu';
 import { useState, useEffect } from 'react';
 import Login from '@pages/Login';
+import { useVersionCheck } from '@/hooks/useVersionCheck';
+import { UpdateBanner } from '@/components/UpdateBanner';
 import Register from '@pages/Register';
 import Dashboard from '@pages/Dashboard';
 import Settings from '@pages/Settings';
@@ -41,6 +43,7 @@ function AppContent() {
   const navigate = useNavigate();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const updateAvailable = useVersionCheck();
 
   // Check login status on mount and whenever localStorage changes
   const checkLoginStatus = () => {
@@ -79,7 +82,7 @@ function AppContent() {
     setUsername('');
     setAllowedSystems([]);
     setDrawerOpen(false);
-    navigate('/login');
+    navigate('/leave-tracker/login');
   };
 
   const handleDrawerToggle = () => {
@@ -189,7 +192,7 @@ function AppContent() {
             </>
           ) : !isMobile && !isLoggedIn ? (
             <>
-              <Button color="inherit" component={Link} to="/login" size="small">
+              <Button color="inherit" component={Link} to="/leave-tracker/login" size="small">
                 Login
               </Button>
               {config.features.enableRegistration && (
@@ -200,7 +203,7 @@ function AppContent() {
             </>
           ) : !isLoggedIn ? (
             <Box>
-              <Button color="inherit" component={Link} to="/login" size="small">
+              <Button color="inherit" component={Link} to="/leave-tracker/login" size="small">
                 Login
               </Button>
               {config.features.enableRegistration && (
@@ -239,15 +242,16 @@ function AppContent() {
           </List>
         </Box>
       </Drawer>
+      <UpdateBanner visible={updateAvailable} />
       <Container>
         <Routes>
           <Route
             path="/"
-            element={<Navigate to={isLoggedIn ? '/app-select' : '/login'} replace />}
+            element={<Navigate to={isLoggedIn ? '/app-select' : '/leave-tracker/login'} replace />}
           />
           <Route
             path="/app-select"
-            element={isLoggedIn ? <AppSelect /> : <Navigate to="/login" replace />}
+            element={isLoggedIn ? <AppSelect /> : <Navigate to="/leave-tracker/login" replace />}
           />
           <Route path="/login" element={<Navigate to="/leave-tracker/login" replace />} />
           <Route
@@ -311,6 +315,10 @@ function AppContent() {
           <Route
             path="/settings"
             element={isLoggedIn && selectedSystem === 'leave-tracker' && canUseLeaveTracker ? <Settings /> : <Navigate to="/app-select" replace />}
+          />
+          <Route
+            path="*"
+            element={<Navigate to={isLoggedIn ? '/app-select' : '/leave-tracker/login'} replace />}
           />
         </Routes>
       </Container>

@@ -1,6 +1,14 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
+import fs from 'fs'
+
+// Write a version.json to public/ so the running app can poll for new deploys
+const buildVersion = Date.now().toString()
+fs.writeFileSync(
+  path.resolve(__dirname, 'public/version.json'),
+  JSON.stringify({ version: buildVersion })
+)
 
 // Production-specific configuration
 // https://vite.dev/config/

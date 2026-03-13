@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { TextField, Button, Card, Typography, Box, Divider, Alert } from "@mui/material";
-import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
+import { GoogleLogin } from '@react-oauth/google';
+import type { CredentialResponse } from '@react-oauth/google';
 import { authApi } from "@services/api";
 import { config } from "@/config";
 
