@@ -64,6 +64,21 @@ class NutriLensSQLiteDB:
                 original_grams  INTEGER,
                 grams_delta     INTEGER NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS nutrilens_settings (
+                setting_key TEXT PRIMARY KEY,
+                setting_value TEXT NOT NULL,
+                updated_by TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS nutrilens_settings_audit (
+                audit_id TEXT PRIMARY KEY,
+                setting_key TEXT NOT NULL,
+                setting_value TEXT NOT NULL,
+                updated_by TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
         """)
         conn.commit()
         conn.close()
@@ -333,6 +348,89 @@ class NutriLensSQLiteDB:
         conn.close()
 
         return [dict(row) for row in rows]
+
+    # ==================== SETTINGS ====================
+
+    def get_nutrilens_setting(self, key: str) -> Optional[Dict[str, Any]]:
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT setting_key, setting_value, updated_by, updated_at FROM nutrilens_settings WHERE setting_key = ?",
+            (key,),
+        )
+        row = cursor.fetchone()
+        conn.close()
+        if not row:
+            return None
+        payload = dict(row)
+        return {
+            "key": payload.get("setting_key"),
+            "value": payload.get("setting_value"),
+            "updated_by": payload.get("updated_by"),
+            "updated_at": payload.get("updated_at"),
+        }
+
+    def set_nutrilens_setting(self, key: str, value: str, updated_by: str) -> Dict[str, Any]:
+        updated_at = datetime.utcnow().isoformat()
+        user = updated_by or "system"
+
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO nutrilens_settings (setting_key, setting_value, updated_by, updated_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(setting_key) DO UPDATE SET
+                setting_value = excluded.setting_value,
+                updated_by = excluded.updated_by,
+                updated_at = excluded.updated_at
+            """,
+            (key, value, user, updated_at),
+        )
+
+        audit_id = str(uuid.uuid4())
+        cursor.execute(
+            """
+            INSERT INTO nutrilens_settings_audit (audit_id, setting_key, setting_value, updated_by, updated_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (audit_id, key, value, user, updated_at),
+        )
+        conn.commit()
+        conn.close()
+
+        return {
+            "key": key,
+            "value": value,
+            "updated_by": user,
+            "updated_at": updated_at,
+        }
+
+    def get_nutrilens_setting_audit(self, key: str, limit: int = 20) -> List[Dict[str, Any]]:
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT audit_id, setting_key, setting_value, updated_by, updated_at
+            FROM nutrilens_settings_audit
+            WHERE setting_key = ?
+            ORDER BY updated_at DESC
+            LIMIT ?
+            """,
+            (key, max(1, int(limit))),
+        )
+        rows = cursor.fetchall()
+        conn.close()
+        return [
+            {
+                "id": row["audit_id"],
+                "key": row["setting_key"],
+                "value": row["setting_value"],
+                "updated_by": row["updated_by"],
+                "updated_at": row["updated_at"],
+            }
+            for row in rows
+        ]
 
 
 # Global singleton

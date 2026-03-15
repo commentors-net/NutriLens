@@ -31,15 +31,19 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
     final authState = ref.watch(authNotifierProvider);
 
     ref.listen(authNotifierProvider, (previous, next) {
-      next.whenData((user) {
-        if (user != null) {
-          context.go('/home');
-        }
-      }).whenError((error, st) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $error')),
-        );
-      });
+      next.when(
+        data: (user) {
+          if (user != null) {
+            context.go('/home');
+          }
+        },
+        loading: () {},
+        error: (error, st) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: $error')),
+          );
+        },
+      );
     });
 
     return Scaffold(

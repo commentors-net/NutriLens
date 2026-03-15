@@ -1,18 +1,18 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../../core/api/food_vision_client.dart';
-import '../../core/api/api_config.dart';
+import '../../core/config/environment.dart';
 import '../../core/models/analyze_response.dart';
 import '../../core/models/meal_draft.dart';
 import '../meals/meals_provider.dart';
-
-final _client = FoodVisionClient(baseUrl: kBackendBaseUrl);
 
 // ─── Analysis provider ────────────────────────────────────────────────────────
 
 /// Holds the state of the meal analysis API call.
 class AnalysisNotifier extends StateNotifier<AsyncValue<AnalyzeMealResponse?>> {
-  AnalysisNotifier() : super(const AsyncValue.data(null));
+  AnalysisNotifier(this._client) : super(const AsyncValue.data(null));
+
+  final FoodVisionClient _client;
 
   /// Sends captured photo paths to backend and stores the result.
   Future<void> analyze(List<String> photoPaths) async {
@@ -48,7 +48,10 @@ class AnalysisNotifier extends StateNotifier<AsyncValue<AnalyzeMealResponse?>> {
 
 final analysisProvider =
     StateNotifierProvider<AnalysisNotifier, AsyncValue<AnalyzeMealResponse?>>(
-  (ref) => AnalysisNotifier(),
+  (ref) {
+    final apiBaseUrl = ref.watch(apiBaseUrlProvider);
+    return AnalysisNotifier(FoodVisionClient(baseUrl: apiBaseUrl));
+  },
 );
 
 // ─── Save meal provider ───────────────────────────────────────────────────────
@@ -56,8 +59,9 @@ final analysisProvider =
 /// Tracks the state of saving a meal to the backend + local DB after the user confirms.
 class SaveMealNotifier extends StateNotifier<AsyncValue<String?>> {
   final Ref _ref;
+  final FoodVisionClient _client;
 
-  SaveMealNotifier(this._ref) : super(const AsyncValue.data(null));
+  SaveMealNotifier(this._ref, this._client) : super(const AsyncValue.data(null));
 
   Future<void> save(AnalyzeMealResponse analysis) async {
     state = const AsyncValue.loading();
@@ -100,6 +104,9 @@ class SaveMealNotifier extends StateNotifier<AsyncValue<String?>> {
 
 final saveMealProvider =
     StateNotifierProvider<SaveMealNotifier, AsyncValue<String?>>(
-  (ref) => SaveMealNotifier(ref),
+  (ref) {
+    final apiBaseUrl = ref.watch(apiBaseUrlProvider);
+    return SaveMealNotifier(ref, FoodVisionClient(baseUrl: apiBaseUrl));
+  },
 );
 

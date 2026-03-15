@@ -1,9 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException
-import google.generativeai as genai
 import os
 import json
 import re
 from typing import List, Optional
+
+try:
+    from google import genai
+except Exception:
+    genai = None
 from .. import schemas
 from ..db_factory import db
 from ..core.security import get_current_user
@@ -19,25 +23,12 @@ FALLBACK_GEMINI_MODELS = [
     "gemini-1.5-flash-latest",
 ]
 _resolved_gemini_model: Optional[str] = None
-if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
+_genai_client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY and genai is not None else None
 
 def _normalize_model_name(model_name: str) -> str:
     if model_name.startswith("models/"):
         return model_name.split("/", 1)[1]
     return model_name
-
-def _list_generate_content_models() -> List[str]:
-    models = []
-    for model in genai.list_models():
-        methods = getattr(model, "supported_generation_methods", []) or []
-        if "generateContent" not in methods:
-            continue
-
-        model_name = _normalize_model_name(getattr(model, "name", ""))
-        if model_name and model_name not in models:
-            models.append(model_name)
-    return models
 
 def resolve_gemini_model(force_refresh: bool = False) -> str:
     global _resolved_gemini_model
@@ -52,41 +43,54 @@ def resolve_gemini_model(force_refresh: bool = False) -> str:
         if normalized and normalized not in candidate_models:
             candidate_models.append(normalized)
 
-    try:
-        available_models = _list_generate_content_models()
-
-        for model_name in candidate_models:
-            if model_name in available_models:
-                _resolved_gemini_model = model_name
-                return _resolved_gemini_model
-
-        if available_models:
-            _resolved_gemini_model = available_models[0]
-            return _resolved_gemini_model
-    except Exception:
-        # If list_models fails, fall back to configured model and let request path surface real API errors.
-        pass
-
-    _resolved_gemini_model = preferred_model
+    _resolved_gemini_model = candidate_models[0] if candidate_models else preferred_model
     return _resolved_gemini_model
 
+def _extract_response_text(response: object) -> str:
+    direct_text = getattr(response, "text", None)
+    if direct_text:
+        return direct_text.strip()
+
+    candidates = getattr(response, "candidates", []) or []
+    for candidate in candidates:
+        content = getattr(candidate, "content", None)
+        parts = getattr(content, "parts", []) or []
+        chunks = []
+        for part in parts:
+            text = getattr(part, "text", None)
+            if text:
+                chunks.append(text)
+        if chunks:
+            return "\n".join(chunks).strip()
+
+    return ""
+
 def generate_content_with_resolved_model(prompt: str):
-    model_name = resolve_gemini_model()
-    try:
-        model = genai.GenerativeModel(model_name)
-        return model.generate_content(prompt), model_name
-    except Exception as first_error:
-        message = str(first_error).lower()
-        should_refresh = "404" in message or "not found" in message or "not supported" in message
-        if not should_refresh:
-            raise
+    if _genai_client is None:
+        raise RuntimeError("google.genai client is not initialized")
 
-        refreshed_model = resolve_gemini_model(force_refresh=True)
-        if refreshed_model == model_name:
-            raise
+    preferred_model = resolve_gemini_model()
+    candidate_models = []
+    for model_name in [preferred_model, *FALLBACK_GEMINI_MODELS]:
+        normalized = _normalize_model_name(model_name)
+        if normalized and normalized not in candidate_models:
+            candidate_models.append(normalized)
 
-        model = genai.GenerativeModel(refreshed_model)
-        return model.generate_content(prompt), refreshed_model
+    last_error = None
+    for model_name in candidate_models:
+        try:
+            response = _genai_client.models.generate_content(
+                model=model_name,
+                contents=prompt,
+            )
+            return _extract_response_text(response), model_name
+        except Exception as error:
+            last_error = error
+            continue
+
+    if last_error is not None:
+        raise last_error
+    raise RuntimeError("Gemini generation failed")
 
 def _extract_retry_seconds(error_text: str) -> Optional[int]:
     retry_in_match = re.search(r"retry in\s+([0-9]+(?:\.[0-9]+)?)s", error_text, flags=re.IGNORECASE)
@@ -231,8 +235,7 @@ Return ONLY valid JSON, no additional text.
 """
         
         # Call Gemini API
-        response, _ = generate_content_with_resolved_model(prompt)
-        response_text = response.text.strip()
+        response_text, _ = generate_content_with_resolved_model(prompt)
         
         # Extract JSON from response (sometimes Gemini wraps it in markdown)
         json_match = re.search(r'\{[\s\S]*\}', response_text)
@@ -275,17 +278,14 @@ async def check_smart_identify_health(current_user: str = Depends(get_current_us
             "message": "Gemini API key not configured",
             "configured": False
         }
+    if _genai_client is None:
+        return {
+            "status": "error",
+            "message": "google.genai client is unavailable",
+            "configured": True
+        }
     
     try:
-        # Validate key and available generateContent models without consuming generation quota.
-        available_models = _list_generate_content_models()
-        if not available_models:
-            return {
-                "status": "error",
-                "message": "Gemini API reachable, but no models support generateContent for this key/project",
-                "configured": True
-            }
-
         resolved_model = resolve_gemini_model(force_refresh=True)
         return {
             "status": "success",

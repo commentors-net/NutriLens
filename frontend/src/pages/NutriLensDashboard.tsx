@@ -19,6 +19,7 @@ import {
 } from '@mui/material';
 import DownloadIcon from '@mui/icons-material/Download';
 import { mealsApi, foodsApi, authApi } from '@services/api';
+import type { CorrectionsAnalyticsResponse } from '@services/api';
 
 interface GoalProgress {
   calories: number;
@@ -60,6 +61,7 @@ interface DashboardData {
     count: number;
     totalKcal: number;
   }>;
+  correctionsAnalytics: CorrectionsAnalyticsResponse;
 }
 
 export default function NutriLensDashboard() {
@@ -67,6 +69,7 @@ export default function NutriLensDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [exportingFormat, setExportingFormat] = useState<'csv' | 'pdf' | null>(null);
+  const [updatingFeedbackRules, setUpdatingFeedbackRules] = useState(false);
 
   const handleExportToday = async (format: 'csv' | 'pdf') => {
     try {
@@ -89,6 +92,44 @@ export default function NutriLensDashboard() {
     }
   };
 
+  const handleToggleFeedbackRules = async () => {
+    if (!data?.correctionsAnalytics.feedback_rules) {
+      return;
+    }
+
+    const targetEnabled = !data.correctionsAnalytics.feedback_rules.enabled;
+
+    try {
+      setUpdatingFeedbackRules(true);
+      setError(null);
+      const response = await mealsApi.updateFeedbackRulesEnabled(targetEnabled);
+      const refreshedAnalytics = await mealsApi.getCorrectionsAnalytics(
+        data.correctionsAnalytics.window.start ?? undefined,
+        data.correctionsAnalytics.window.end ?? undefined,
+        data.correctionsAnalytics.window.limit || 1000,
+      );
+
+      setData((prev) => {
+        if (!prev) {
+          return prev;
+        }
+
+        return {
+          ...prev,
+          correctionsAnalytics: {
+            ...refreshedAnalytics,
+            feedback_rules: response.feedback_rules,
+          },
+        };
+      });
+    } catch (err) {
+      console.error('Feedback-rules update failed:', err);
+      setError(err instanceof Error ? err.message : 'Failed to update feedback auto-adjust setting');
+    } finally {
+      setUpdatingFeedbackRules(false);
+    }
+  };
+
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
@@ -98,8 +139,11 @@ export default function NutriLensDashboard() {
         const today = new Date();
         const startDate = new Date(today);
         startDate.setDate(startDate.getDate() - 6);
+        const analyticsStartDate = new Date(today);
+        analyticsStartDate.setDate(analyticsStartDate.getDate() - 29);
         const todayStr = today.toISOString().split('T')[0];
         const startDateStr = startDate.toISOString().split('T')[0];
+        const analyticsStartDateStr = analyticsStartDate.toISOString().split('T')[0];
 
         // Fetch foods count
         const foods = await foodsApi.listAll();
@@ -108,6 +152,11 @@ export default function NutriLensDashboard() {
         // Fetch today's meal totals
         const todayMeals = await mealsApi.getTodayTotals();
         const recentRangeMeals = await mealsApi.getMealsByRange(startDateStr, todayStr);
+        const correctionsAnalytics = await mealsApi.getCorrectionsAnalytics(
+          analyticsStartDateStr,
+          todayStr,
+          1000,
+        );
         const todayTotalKcal = todayMeals.total_kcal || 0;
         const todayMealCount = todayMeals.meal_count || 0;
         const todayTotalProtein = todayMeals.total_protein_g || 0;
@@ -201,6 +250,7 @@ export default function NutriLensDashboard() {
           goalProgress,
           recentMeals,
           topFoods,
+          correctionsAnalytics,
         });
       } catch (err) {
         console.error('Dashboard fetch error:', err);
@@ -454,6 +504,100 @@ export default function NutriLensDashboard() {
             </TableContainer>
           ) : (
             <Typography color="textSecondary">No food data available</Typography>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card sx={{ mt: 4 }}>
+        <CardHeader title="Correction Analytics (last 30 days)" />
+        <CardContent>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr 1fr' }, gap: 2, mb: 3 }}>
+            <Card variant="outlined">
+              <CardContent>
+                <Typography color="textSecondary" gutterBottom>
+                  Total Corrections
+                </Typography>
+                <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
+                  {data.correctionsAnalytics.count}
+                </Typography>
+              </CardContent>
+            </Card>
+            <Card variant="outlined">
+              <CardContent>
+                <Typography color="textSecondary" gutterBottom>
+                  Avg Grams Delta
+                </Typography>
+                <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
+                  {data.correctionsAnalytics.avg_grams_delta}
+                </Typography>
+              </CardContent>
+            </Card>
+            <Card variant="outlined">
+              <CardContent>
+                <Typography color="textSecondary" gutterBottom>
+                  Unique Corrected Labels
+                </Typography>
+                <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
+                  {data.correctionsAnalytics.correction_frequency.by_corrected_label.length}
+                </Typography>
+              </CardContent>
+            </Card>
+            <Card variant="outlined">
+              <CardContent>
+                <Typography color="textSecondary" gutterBottom>
+                  Auto-Adjust Status
+                </Typography>
+                <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
+                  {data.correctionsAnalytics.feedback_rules?.enabled ? 'Enabled' : 'Disabled'}
+                </Typography>
+                <Typography variant="caption" color="textSecondary">
+                  Hit rate: {data.correctionsAnalytics.feedback_rules?.metrics.rule_hit_rate_pct ?? 0}% · Active rules: {data.correctionsAnalytics.feedback_rules?.active_rule_count ?? 0}
+                </Typography>
+                <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mt: 0.5 }}>
+                  Last changed: {data.correctionsAnalytics.feedback_rules?.last_change?.updated_by ?? 'n/a'}{data.correctionsAnalytics.feedback_rules?.last_change?.updated_at ? ` @ ${new Date(data.correctionsAnalytics.feedback_rules.last_change.updated_at).toLocaleString()}` : ''}
+                </Typography>
+                <Box sx={{ mt: 2 }}>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={handleToggleFeedbackRules}
+                    disabled={updatingFeedbackRules || !data.correctionsAnalytics.feedback_rules}
+                  >
+                    {updatingFeedbackRules
+                      ? 'Updating...'
+                      : data.correctionsAnalytics.feedback_rules?.enabled
+                        ? 'Disable Auto-Adjust'
+                        : 'Enable Auto-Adjust'}
+                  </Button>
+                </Box>
+              </CardContent>
+            </Card>
+          </Box>
+
+          <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold' }}>
+            Top Corrected Labels
+          </Typography>
+          {data.correctionsAnalytics.top_corrected_labels.length > 0 ? (
+            <TableContainer>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Label</TableCell>
+                    <TableCell align="right">Corrections</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {data.correctionsAnalytics.top_corrected_labels.slice(0, 10).map((entry, index) => (
+                    <TableRow key={`${entry.label}-${index}`}>
+                      <TableCell>{entry.label}</TableCell>
+                      <TableCell align="right">{entry.count}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          ) : (
+            <Typography color="textSecondary">No correction data in selected window.</Typography>
           )}
         </CardContent>
       </Card>

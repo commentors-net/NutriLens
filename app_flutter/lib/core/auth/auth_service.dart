@@ -1,10 +1,15 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../api/api_config.dart';
+import '../config/environment.dart';
 
 /// Authentication service managing Firebase Auth and backend sync
 class AuthService {
+  AuthService({required this.baseUrl});
+
+  final String baseUrl;
   final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
   final Dio _dio = Dio();
@@ -115,7 +120,7 @@ class AuthService {
 
       final idToken = await user.getIdToken();
       final response = await _dio.post(
-        '$kBackendBaseUrl/auth/sync',
+        '$baseUrl/auth/sync',
         options: Options(headers: {'Authorization': 'Bearer $idToken'}),
         data: {
           'email': user.email,
@@ -141,7 +146,7 @@ class AuthService {
 
       final idToken = await user.getIdToken();
       final response = await _dio.get(
-        '$kBackendBaseUrl/auth/me',
+        '$baseUrl/auth/me',
         options: Options(headers: {'Authorization': 'Bearer $idToken'}),
       );
 
@@ -183,9 +188,10 @@ class AuthService {
 }
 
 /// Riverpod provider for AuthService
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-
-final authServiceProvider = Provider((ref) => AuthService());
+final authServiceProvider = Provider((ref) {
+  final apiBaseUrl = ref.watch(apiBaseUrlProvider);
+  return AuthService(baseUrl: apiBaseUrl);
+});
 
 final authStateProvider = StreamProvider((ref) {
   final authService = ref.watch(authServiceProvider);

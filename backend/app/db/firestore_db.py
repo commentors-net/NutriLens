@@ -23,6 +23,8 @@ class NutriLensFirestoreDB:
     FOODS = "nutrilens_foods"
     MEALS = "nutrilens_meals"
     CORRECTIONS = "nutrilens_meal_corrections"
+    SETTINGS = "nutrilens_settings"
+    SETTINGS_AUDIT = "nutrilens_settings_audit"
 
     def __init__(self) -> None:
         project_id = os.getenv("GCP_PROJECT_ID", "leave-tracker-2025")
@@ -200,6 +202,46 @@ class NutriLensFirestoreDB:
         corrections = [{"id": d.id, **d.to_dict()} for d in docs]
         corrections.sort(key=lambda entry: entry.get("timestamp", ""), reverse=True)
         return corrections
+
+    # ==================== SETTINGS ====================
+
+    def get_nutrilens_setting(self, key: str) -> Optional[Dict[str, Any]]:
+        ref = self.db.collection(self.SETTINGS).document(key)
+        doc = ref.get()
+        if not doc.exists:
+            return None
+        payload = doc.to_dict() or {}
+        return {
+            "key": key,
+            "value": payload.get("value"),
+            "updated_by": payload.get("updated_by", "system"),
+            "updated_at": payload.get("updated_at"),
+        }
+
+    def set_nutrilens_setting(self, key: str, value: str, updated_by: str) -> Dict[str, Any]:
+        updated_at = datetime.utcnow().isoformat()
+        data = {
+            "key": key,
+            "value": value,
+            "updated_by": updated_by or "system",
+            "updated_at": updated_at,
+        }
+        self.db.collection(self.SETTINGS).document(key).set(data)
+
+        audit_id = f"{key}-{updated_at}-{updated_by or 'system'}"
+        self.db.collection(self.SETTINGS_AUDIT).document(audit_id).set(data)
+        return data
+
+    def get_nutrilens_setting_audit(self, key: str, limit: int = 20) -> List[Dict[str, Any]]:
+        docs = (
+            self.db.collection(self.SETTINGS_AUDIT)
+            .where("key", "==", key)
+            .limit(limit)
+            .stream()
+        )
+        entries = [{"id": d.id, **d.to_dict()} for d in docs]
+        entries.sort(key=lambda entry: entry.get("updated_at", ""), reverse=True)
+        return entries
 
 
 # Lazy singleton — only instantiate when actually needed (i.e., when ENVIRONMENT != development)

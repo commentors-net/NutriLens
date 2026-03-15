@@ -35,7 +35,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       final isLoggingIn = state.uri.path == AppRoutes.login;
       final isSigningUp = state.uri.path == AppRoutes.signup;
-      final isAuthenticated = authNotifier.whenData((user) => user != null).value ?? false;
+      final isAuthenticated = authNotifier.maybeWhen(
+        data: (user) => user != null,
+        orElse: () => false,
+      );
 
       // If not authenticated and not on login/signup pages, redirect to login
       if (!isAuthenticated && !isLoggingIn && !isSigningUp) {

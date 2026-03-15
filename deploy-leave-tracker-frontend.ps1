@@ -3,6 +3,7 @@ param(
     [string]$ProjectId = "leave-tracker-2025",
     [string]$BucketName = "leave-tracker-2025-frontend",
     [string]$ApiUrl = "",
+    [string]$GoogleClientId = "",
     [switch]$CleanBucket
 )
 
@@ -17,9 +18,61 @@ if (-not (Test-Path $frontendPath)) {
     exit 1
 }
 
-if ($ApiUrl -ne "") {
-    "VITE_API_URL=$ApiUrl" | Out-File -FilePath "$frontendPath\.env.production" -Encoding utf8
-    "VITE_ENABLE_REGISTRATION=true" | Out-File -FilePath "$frontendPath\.env.production" -Append -Encoding utf8
+function Get-EnvValueFromFile {
+    param(
+        [string]$FilePath,
+        [string]$Key
+    )
+
+    if (-not (Test-Path $FilePath)) {
+        return ""
+    }
+
+    foreach ($line in Get-Content $FilePath) {
+        if ($line -match '^\s*#' -or $line -notmatch '=') {
+            continue
+        }
+        $parts = $line -split '=', 2
+        if ($parts[0].Trim() -eq $Key) {
+            return $parts[1].Trim()
+        }
+    }
+
+    return ""
+}
+
+$prodEnvPath = "$frontendPath\.env.production"
+$devEnvPath = "$frontendPath\.env.development"
+
+$resolvedApiUrl = $ApiUrl
+if ([string]::IsNullOrWhiteSpace($resolvedApiUrl)) {
+    $resolvedApiUrl = Get-EnvValueFromFile -FilePath $prodEnvPath -Key "VITE_API_URL"
+}
+
+$resolvedRegistration = Get-EnvValueFromFile -FilePath $prodEnvPath -Key "VITE_ENABLE_REGISTRATION"
+if ([string]::IsNullOrWhiteSpace($resolvedRegistration)) {
+    $resolvedRegistration = "true"
+}
+
+$resolvedGoogleClientId = $GoogleClientId
+if ([string]::IsNullOrWhiteSpace($resolvedGoogleClientId)) {
+    $resolvedGoogleClientId = Get-EnvValueFromFile -FilePath $prodEnvPath -Key "VITE_GOOGLE_CLIENT_ID"
+}
+if ([string]::IsNullOrWhiteSpace($resolvedGoogleClientId)) {
+    $resolvedGoogleClientId = Get-EnvValueFromFile -FilePath $devEnvPath -Key "VITE_GOOGLE_CLIENT_ID"
+}
+
+$envLines = @()
+if (-not [string]::IsNullOrWhiteSpace($resolvedApiUrl)) {
+    $envLines += "VITE_API_URL=$resolvedApiUrl"
+}
+$envLines += "VITE_ENABLE_REGISTRATION=$resolvedRegistration"
+if (-not [string]::IsNullOrWhiteSpace($resolvedGoogleClientId)) {
+    $envLines += "VITE_GOOGLE_CLIENT_ID=$resolvedGoogleClientId"
+}
+
+if ($envLines.Count -gt 0) {
+    Set-Content -Path $prodEnvPath -Value $envLines -Encoding utf8
 }
 
 Write-Host "Step 1/4: Building frontend..." -ForegroundColor Yellow

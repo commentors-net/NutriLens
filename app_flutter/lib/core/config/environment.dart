@@ -31,21 +31,26 @@ extension AppEnvironmentName on AppEnvironment {
 
 /// Environment state notifier
 class EnvironmentNotifier extends StateNotifier<AppEnvironment> {
-  final SharedPreferences prefs;
+  final SharedPreferences? prefs;
 
   EnvironmentNotifier(this.prefs)
       : super(_loadEnvironment(prefs));
 
-  static AppEnvironment _loadEnvironment(SharedPreferences prefs) {
+  static AppEnvironment _loadEnvironment(SharedPreferences? prefs) {
+    if (prefs == null) {
+      return AppEnvironment.live;
+    }
     final savedEnv = prefs.getString('app_environment') ?? 'live';
     return savedEnv == 'debug' ? AppEnvironment.debug : AppEnvironment.live;
   }
 
   Future<void> setEnvironment(AppEnvironment env) async {
-    await prefs.setString(
-      'app_environment',
-      env == AppEnvironment.debug ? 'debug' : 'live',
-    );
+    if (prefs != null) {
+      await prefs!.setString(
+        'app_environment',
+        env == AppEnvironment.debug ? 'debug' : 'live',
+      );
+    }
     state = env;
   }
 
@@ -65,10 +70,7 @@ final environmentProvider =
   return prefsAsync.when(
     data: (prefs) => EnvironmentNotifier(prefs),
     loading: () => EnvironmentNotifier(null),
-    error: (err, st) {
-      // Fallback if SharedPreferences fails
-      throw Exception('Failed to load environment: $err');
-    },
+    error: (err, st) => EnvironmentNotifier(null),
   );
 });
 

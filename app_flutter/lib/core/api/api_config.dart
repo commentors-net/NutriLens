@@ -2,8 +2,8 @@
 /// Environment is now dynamically selected via environment provider.
 /// See lib/core/config/environment.dart for details.
 
-// Dynamic configuration - use apiBaseUrlProvider instead
-// const String kBackendBaseUrl = 'https://nutrilens-api-2ajzj2dbrq-uc.a.run.app';
+// Backward-compatible default while providers inject the active environment URL.
+const String kBackendBaseUrl = kBackendBaseUrlProd;
 
 // Production (Cloud Run)
 const String kBackendBaseUrlProd = 'https://nutrilens-api-2ajzj2dbrq-uc.a.run.app';

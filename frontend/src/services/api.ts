@@ -425,6 +425,86 @@ export interface MealTotalResponse {
   meals: Meal[];
 }
 
+export interface CorrectionLabelStat {
+  label: string;
+  count: number;
+}
+
+export interface CorrectionDateStat {
+  date: string;
+  count: number;
+}
+
+export interface CorrectionsAnalyticsResponse {
+  count: number;
+  window: {
+    start: string | null;
+    end: string | null;
+    limit: number;
+  };
+  top_corrected_labels: CorrectionLabelStat[];
+  avg_grams_delta: number;
+  correction_frequency: {
+    by_date: CorrectionDateStat[];
+    by_corrected_label: CorrectionLabelStat[];
+  };
+  feedback_rules?: {
+    enabled: boolean;
+    configured_default_enabled?: boolean;
+    last_change?: {
+      updated_by: string;
+      updated_at: string;
+    } | null;
+    settings: {
+      cache_ttl_seconds: number;
+      min_samples: number;
+      min_confidence: number;
+      max_fetch: number;
+    };
+    active_rule_count: number;
+    metrics: {
+      analyze_requests_total: number;
+      feedback_rules_enabled_requests: number;
+      feedback_rules_disabled_requests: number;
+      rules_cache_refresh_count: number;
+      rules_applied_request_count: number;
+      rules_applied_item_count: number;
+      rule_hit_rate_pct: number;
+    };
+  };
+}
+
+export interface FeedbackRulesStatusResponse {
+  enabled: boolean;
+  configured_default_enabled: boolean;
+  last_change?: {
+    updated_by: string;
+    updated_at: string;
+  } | null;
+  settings: {
+    cache_ttl_seconds: number;
+    min_samples: number;
+    min_confidence: number;
+    max_fetch: number;
+  };
+  active_rule_count: number;
+  metrics: {
+    analyze_requests_total: number;
+    feedback_rules_enabled_requests: number;
+    feedback_rules_disabled_requests: number;
+    rules_cache_refresh_count: number;
+    rules_applied_request_count: number;
+    rules_applied_item_count: number;
+    rule_hit_rate_pct: number;
+  };
+}
+
+export interface FeedbackRulesUpdateResponse {
+  status: string;
+  updated_by: string;
+  feedback_rules: FeedbackRulesStatusResponse;
+}
+
 export interface NutriLensProfileResponse {
   username: string;
   daily_calorie_goal: number;
@@ -458,6 +538,33 @@ export const mealsApi = {
     const response = await apiClient.get(`${config.apiUrl}/meals/export`, {
       params: { start: startDate, end: endDate, format },
       responseType: "blob",
+    });
+    return response.data;
+  },
+
+  getCorrectionsAnalytics: async (
+    startDate?: string,
+    endDate?: string,
+    limit = 1000,
+  ): Promise<CorrectionsAnalyticsResponse> => {
+    const response = await apiClient.get(`${config.apiUrl}/meals/corrections/analytics`, {
+      params: {
+        start: startDate,
+        end: endDate,
+        limit,
+      },
+    });
+    return response.data;
+  },
+
+  getFeedbackRulesStatus: async (): Promise<FeedbackRulesStatusResponse> => {
+    const response = await apiClient.get(`${config.apiUrl}/meals/corrections/feedback-rules`);
+    return response.data;
+  },
+
+  updateFeedbackRulesEnabled: async (enabled: boolean): Promise<FeedbackRulesUpdateResponse> => {
+    const response = await apiClient.patch(`${config.apiUrl}/meals/corrections/feedback-rules`, {
+      enabled,
     });
     return response.data;
   },

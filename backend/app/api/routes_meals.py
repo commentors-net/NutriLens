@@ -10,25 +10,52 @@ import logging
 import json
 import uuid
 import csv
+import os
+from collections import Counter
 from io import StringIO, BytesIO
 from datetime import date, datetime
 from typing import List, Optional, Literal
 
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 from reportlab.pdfgen import canvas
 
 from app.db.db_factory import db
+from app.leave_tracker.db_factory import db as auth_db
+from app.leave_tracker.core.security import get_current_user
 from app.models.schemas import (
     AnalyzeMealResponse,
     MealTotalResponse,
     SaveMealRequest,
 )
-from app.services.analysis import analyze_images
+from app.services.analysis import (
+    analyze_images,
+    get_feedback_rule_observability,
+    set_feedback_rules_enabled,
+)
 from app.services.nutrition import get_food_fuzzy, compute_macros_from_food
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+class FeedbackRulesToggleRequest(BaseModel):
+    enabled: bool
+
+
+def _require_access_admin(current_user: str) -> None:
+    user = auth_db.get_user_by_username(current_user)
+    if user and user.get("is_admin"):
+        return
+
+    configured = os.getenv("ADMIN_USERS", "").strip()
+    if not configured:
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    admin_users = {u.strip() for u in configured.split(",") if u.strip()}
+    if current_user not in admin_users:
+        raise HTTPException(status_code=403, detail="Admin access required")
 
 
 def _parse_date(date_str: str) -> datetime:
@@ -189,6 +216,111 @@ async def get_meal_corrections(
     return {
         "count": len(corrections),
         "corrections": corrections,
+    }
+
+
+@router.get("/corrections/analytics")
+async def get_meal_correction_analytics(
+    start: Optional[str] = None,
+    end: Optional[str] = None,
+    limit: int = 1000,
+):
+    if start:
+        _parse_date(start)
+    if end:
+        _parse_date(end)
+    if start and end and start > end:
+        raise HTTPException(status_code=400, detail="start date must be on or before end date")
+
+    bounded_limit = max(1, min(limit, 5000))
+
+    if not hasattr(db, "get_corrections"):
+        return {
+            "count": 0,
+            "top_corrected_labels": [],
+            "avg_grams_delta": 0.0,
+            "correction_frequency": {
+                "by_date": [],
+                "by_corrected_label": [],
+            },
+        }
+
+    corrections = db.get_corrections(start_date=start, end_date=end, limit=bounded_limit)
+
+    label_counter = Counter()
+    date_counter = Counter()
+    delta_sum = 0
+    delta_count = 0
+
+    for correction in corrections:
+        corrected_label = str(correction.get("corrected_label") or "").strip().lower()
+        if corrected_label:
+            label_counter[corrected_label] += 1
+
+        date_str = str(correction.get("date_str") or "").strip()
+        if date_str:
+            date_counter[date_str] += 1
+
+        try:
+            delta = int(correction.get("grams_delta", 0))
+            delta_sum += delta
+            delta_count += 1
+        except (TypeError, ValueError):
+            continue
+
+    top_corrected_labels = [
+        {"label": label, "count": count}
+        for label, count in label_counter.most_common(10)
+    ]
+
+    by_date = [
+        {"date": date_key, "count": count}
+        for date_key, count in sorted(date_counter.items(), key=lambda item: item[0])
+    ]
+
+    by_corrected_label = [
+        {"label": label, "count": count}
+        for label, count in label_counter.most_common()
+    ]
+
+    avg_grams_delta = round(delta_sum / delta_count, 2) if delta_count else 0.0
+
+    return {
+        "count": len(corrections),
+        "window": {
+            "start": start,
+            "end": end,
+            "limit": bounded_limit,
+        },
+        "top_corrected_labels": top_corrected_labels,
+        "avg_grams_delta": avg_grams_delta,
+        "correction_frequency": {
+            "by_date": by_date,
+            "by_corrected_label": by_corrected_label,
+        },
+        "feedback_rules": get_feedback_rule_observability(),
+    }
+
+
+@router.get("/corrections/feedback-rules")
+async def get_feedback_rules_runtime_status(
+    current_user: str = Depends(get_current_user),
+):
+    _require_access_admin(current_user)
+    return get_feedback_rule_observability()
+
+
+@router.patch("/corrections/feedback-rules")
+async def update_feedback_rules_runtime_status(
+    payload: FeedbackRulesToggleRequest,
+    current_user: str = Depends(get_current_user),
+):
+    _require_access_admin(current_user)
+    status_payload = set_feedback_rules_enabled(payload.enabled, updated_by=current_user)
+    return {
+        "status": "updated",
+        "updated_by": current_user,
+        "feedback_rules": status_payload,
     }
 
 

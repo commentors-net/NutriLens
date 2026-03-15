@@ -11,6 +11,185 @@
 
 ---
 
+## ▶ RESUME HERE — Last session: 2026-03-14 — Feedback Toggle + Observability Added ✅
+
+**STATUS AT SESSION END (2026-03-14):**
+- ✅ Leave Tracker smart-identification module migrated from `google.generativeai` to `google.genai`.
+- ✅ Deprecated `google-generativeai` removed from active runtime dependency set.
+- ✅ Unified backend deployed successfully with healthy Cloud Run revision `nutrilens-api-00018-gsc`.
+- ✅ Human-in-the-loop auto-adjustment layer deployed (feedback rules from corrections applied to future analysis outputs).
+- ✅ Added configurable feedback-rule enable/disable toggle (`NUTRILENS_FEEDBACK_RULES_ENABLED`) and runtime observability metrics.
+- ✅ Toggle/observability patch deployed live on Cloud Run revision `nutrilens-api-00021-xwk` and verified via analytics endpoint.
+- ✅ Added admin-only runtime control endpoints for feedback rules and deployed on Cloud Run revision `nutrilens-api-00022-5dt`.
+- ✅ Added frontend admin dashboard control to toggle feedback rules without manual API calls.
+- ✅ Persisted feedback-toggle state + audit trail implemented and deployed (survives restarts/redeploys).
+- ✅ Fixed production Google SSO regression (missing `VITE_GOOGLE_CLIENT_ID` in production build env).
+
+### Cloud Integration Readiness (2026-03-14)
+
+**Go/No-Go:** ✅ **GO — ready for cloud integration testing now**
+
+**Validated now:**
+- ✅ Backend health endpoint responds: `GET /health`.
+- ✅ Core analytics endpoint responds with expected payload shape (including `feedback_rules` metadata):
+  - `GET /meals/corrections/analytics?limit=20`
+- ✅ Frontend production URL is reachable:
+  - `https://storage.googleapis.com/leave-tracker-2025-frontend/index.html`
+
+**What to test next (manual cloud QA):**
+1. Login on production frontend with an admin account.
+2. Open NutriLens Dashboard → Correction Analytics card.
+3. Toggle Auto-Adjust (Enable/Disable) and confirm:
+   - status changes,
+   - `Last changed: <user> @ <time>` updates,
+   - state persists after hard refresh and re-login.
+4. Run one analyze + save flow and verify correction analytics updates.
+5. Verify export endpoints still work (CSV/PDF) from dashboard/history.
+
+**Known expected state before first admin toggle:**
+- `feedback_rules.last_change` may be `null` and `recent_audit` empty until first authenticated admin toggle is performed in production.
+
+### Next After Cloud QA
+
+1. Add trend analytics endpoints (7-day/30-day correction rate and top corrected originals).
+2. Add lightweight dashboard trend cards/charts from those aggregates.
+3. Add role guard in frontend (show toggle button only for admin users).
+4. Add one integration test for persisted toggle/audit behavior in backend.
+
+**What was completed this session:**
+1. ✅ Migrated Leave Tracker Gemini path:
+  - Updated `backend/app/leave_tracker/api/smart_identification.py` to use `google.genai` client-based generation.
+  - Replaced legacy model invocation (`GenerativeModel(...).generate_content(...)`) with `client.models.generate_content(...)`.
+  - Added response-text extraction helper for SDK response shape compatibility.
+2. ✅ Completed dependency cleanup for active modules:
+  - Removed `google-generativeai` from `backend/requirements.txt`.
+  - Kept `google-genai` as the active Gemini SDK.
+3. ✅ Deployment and runtime verification:
+  - Deployed backend and confirmed healthy revision: `nutrilens-api-00018-gsc`.
+  - Verified service health endpoint: `/health` returns `ok`.
+  - Verified smart-identify routes are registered (`/api/smart-identify*` and namespaced aliases).
+  - Verified protected smart-identify health path returns auth status (403), not server error.
+  - Verified NutriLens analyze endpoint still responds successfully.
+4. ✅ Correction analytics visualization shipped to web frontend:
+  - Updated `frontend/src/services/api.ts` with correction analytics API typing/client.
+  - Updated `frontend/src/pages/NutriLensDashboard.tsx` with a new “Correction Analytics (last 30 days)” section.
+  - Deployed frontend to `https://storage.googleapis.com/leave-tracker-2025-frontend/index.html`.
+5. ✅ Implemented auto-feedback postprocessing for NutriLens analysis:
+  - Updated `backend/app/services/analysis.py` to build cached feedback rules from correction logs.
+  - Rules map frequent `original_label -> corrected_label` patterns and average grams delta.
+  - Rules are applied to analysis responses before returning to clients.
+  - Deployed on Cloud Run revision `nutrilens-api-00019-hv2`.
+6. ✅ Added toggle + observability for feedback rules:
+  - Updated `backend/app/services/analysis.py` with `NUTRILENS_FEEDBACK_RULES_ENABLED` (default `true`).
+  - Added in-memory metrics counters: analyze calls, enabled/disabled requests, cache refreshes, applied request/item counts, hit-rate percent.
+  - Exposed metrics payload via `GET /meals/corrections/analytics` under `feedback_rules`.
+  - Updated `frontend/src/services/api.ts` typing and `frontend/src/pages/NutriLensDashboard.tsx` UI to display auto-adjust status, hit rate, and active rule count.
+  - Local validations completed: backend `py_compile` and frontend `npm run build`.
+  - Deployed backend with immutable image tag to Cloud Run revision `nutrilens-api-00021-xwk`.
+  - Deployed frontend to `https://storage.googleapis.com/leave-tracker-2025-frontend/index.html`.
+  - Verified live API response includes `feedback_rules` block on `GET /meals/corrections/analytics`.
+7. ✅ Added admin runtime toggle API (no redeploy required to flip at runtime):
+  - `GET /meals/corrections/feedback-rules` (and `/nutrilens/meals/corrections/feedback-rules`) returns current runtime toggle + metrics.
+  - `PATCH /meals/corrections/feedback-rules` with `{ "enabled": true|false }` updates runtime state.
+  - Endpoint access is admin-only and uses existing JWT auth + admin checks (`is_admin` or `ADMIN_USERS` fallback).
+  - Live verification:
+    - OpenAPI includes both new endpoints.
+    - Unauthenticated calls return `Not authenticated`.
+8. ✅ Added UI control for admin runtime toggle in NutriLens dashboard:
+  - Updated `frontend/src/services/api.ts` with typed methods for:
+    - `GET /meals/corrections/feedback-rules`
+    - `PATCH /meals/corrections/feedback-rules`
+  - Updated `frontend/src/pages/NutriLensDashboard.tsx` with a button in “Auto-Adjust Status” card:
+    - `Disable Auto-Adjust` when enabled
+    - `Enable Auto-Adjust` when disabled
+  - UI updates status/metrics in-place after successful toggle call.
+  - Deployed frontend successfully to `https://storage.googleapis.com/leave-tracker-2025-frontend/index.html`.
+9. ✅ Persisted feedback toggle + audit trail:
+  - Added NutriLens settings persistence methods in both DB backends:
+    - `backend/app/db/firestore_db.py`
+    - `backend/app/db/sqlite_db_cloud.py`
+  - New setting key: `feedback_rules_enabled`.
+  - Added audit log storage for setting changes with `updated_by` and `updated_at`.
+  - Updated `backend/app/services/analysis.py` to:
+    - Load persisted setting on use/startup path.
+    - Persist toggle updates from admin endpoint.
+    - Expose `last_change` and `recent_audit` in feedback observability payload.
+  - Updated admin toggle endpoint to persist `updated_by` from authenticated user.
+  - Fixed admin user lookup in meal routes to use Leave Tracker user DB factory.
+  - Dashboard now shows “Last changed: <user> @ <time>” in Auto-Adjust card.
+  - Backend deployed to Cloud Run revision `nutrilens-api-00023-2jl`.
+  - Frontend deployed to `https://storage.googleapis.com/leave-tracker-2025-frontend/index.html`.
+  - Live verification: `GET /meals/corrections/analytics` includes `feedback_rules.last_change` and `feedback_rules.recent_audit` fields.
+10. ✅ Fixed Google SSO disabled message in production frontend:
+  - Root cause: `frontend/.env.production` lacked `VITE_GOOGLE_CLIENT_ID`, so production bundle compiled with empty `googleClientId`.
+  - Updated `deploy-leave-tracker-frontend.ps1` to resolve env values safely:
+    - `GoogleClientId` param supported.
+    - Falls back to existing `.env.production` value.
+    - Falls back to `.env.development` if production value is missing.
+    - Preserves existing production env keys instead of overwriting them unexpectedly.
+  - Redeployed frontend and verified built asset now contains non-empty Google OAuth client ID.
+
+**Important note:**
+- A backup file (`smart_identification.py.backup-postgresql`) still contains legacy `google.generativeai` import text, but it is not part of active runtime.
+
+**Current Milestone 4 Snapshot:**
+- ✅ NutriLens AI path on `google.genai`
+- ✅ Leave Tracker smart-identification path on `google.genai`
+- ✅ Correction logging and correction analytics endpoints live
+- ✅ Feedback-rule toggle and observability instrumentation in place
+- ✅ Latest toggle/observability patch deployed and verified in production
+- ✅ Admin runtime toggle endpoint deployed and verified in production
+- ✅ Admin runtime toggle UI deployed in production dashboard
+- ✅ Feedback toggle now persists across restarts with audit trail and last-change visibility
+- ⏳ Remaining: deeper trend analytics and optional per-user/admin policy controls
+
+---
+
+## ▶ RESUME HERE — Last session: 2026-03-14 — GenAI Migration + Correction Analytics Deployed ✅
+
+**STATUS AT SESSION END (2026-03-14):**
+- ✅ NutriLens analysis path migrated to `google.genai` (with deterministic fallback preserved).
+- ✅ Correction analytics endpoint is implemented and live.
+- ✅ Backend deployed and production-verified on Cloud Run revision `nutrilens-api-00017-l6w`.
+
+**What was completed this session:**
+1. ✅ Migrated NutriLens Gemini integration to `google.genai`:
+  - Updated `backend/app/services/analysis.py`.
+  - Added robust optional import handling and response-text extraction.
+  - Kept model fallback behavior and deterministic fallback reliability.
+2. ✅ Added correction analytics reporting endpoint:
+  - `GET /meals/corrections/analytics`
+  - Namespaced alias: `GET /nutrilens/meals/corrections/analytics`
+  - Response includes:
+    - `top_corrected_labels`
+    - `avg_grams_delta`
+    - `correction_frequency.by_date`
+    - `correction_frequency.by_corrected_label`
+3. ✅ Dependency update:
+  - Added `google-genai` to `backend/requirements.txt`.
+  - Kept `google-generativeai` for Leave Tracker compatibility (`leave_tracker/api/smart_identification.py` still imports it).
+4. ✅ Production verification performed:
+  - `POST /meals` with corrected item → `correction_count=1`.
+  - `GET /meals/corrections` returns persisted correction events.
+  - `GET /meals/corrections/analytics` returns aggregate analytics (count, top labels, average grams delta, frequency).
+  - `POST /meals/analyze` with 3 sample files returns valid analysis response.
+
+**Important compatibility note:**
+- Full repository migration away from `google.generativeai` is **not complete yet** because Leave Tracker AI module still depends on it.
+- NutriLens path is now on `google.genai`; remaining deprecation cleanup requires migrating Leave Tracker AI code too.
+
+**Recommended next implementation options:**
+1. Complete full deprecation cleanup:
+  - Migrate `backend/app/leave_tracker/api/smart_identification.py` from `google.generativeai` to `google.genai`.
+  - Remove `google-generativeai` from requirements once all call sites are migrated.
+2. Extend correction analytics for tuning:
+  - Add date-windowed trend metrics (7/30-day correction rates).
+  - Add per-food precision signals (most corrected original labels vs corrected labels).
+3. Productize analytics visibility:
+  - Surface correction analytics in NutriLens admin dashboard.
+
+---
+
 ## ▶ RESUME HERE — Last session: 2026-03-13 — Correction Tuning Logs Live ✅
 
 **STATUS AT SESSION END (2026-03-13):**

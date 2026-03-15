@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/config/environment.dart';
 import '../../core/auth/auth_service.dart';
+import '../auth/auth_provider.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({Key? key}) : super(key: key);
@@ -256,6 +257,3 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 }
-
-// Import for AuthNotifier
-import '../auth/auth_provider.dart';
