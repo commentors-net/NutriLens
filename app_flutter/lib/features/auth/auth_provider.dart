@@ -44,6 +44,25 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
       await authService.syncUserToBackend();
       state = AsyncValue.data(authService.currentUser);
     } catch (e, st) {
+      final errorText = e.toString();
+      var currentUser = authService.currentUser;
+
+      // Work around known GoogleSignIn Android Pigeon cast issue that can
+      // occur even after Firebase auth has already completed successfully.
+      if (errorText.contains('PigeonUserDetails')) {
+        // Firebase state can be set a moment after the plugin throws.
+        for (var i = 0; i < 6 && currentUser == null; i++) {
+          await Future.delayed(const Duration(milliseconds: 200));
+          currentUser = authService.currentUser;
+        }
+
+        if (currentUser != null) {
+          await authService.syncUserToBackend();
+          state = AsyncValue.data(currentUser);
+          return;
+        }
+      }
+
       state = AsyncValue.error(e, st);
     }
   }
