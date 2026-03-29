@@ -6,6 +6,7 @@ import '../features/capture/review_screen.dart';
 import '../features/results/results_screen.dart';
 import '../features/home/home_screen.dart';
 import '../features/meals/saved_meals_screen.dart';
+import '../features/meals/meal_history_screen.dart';
 import '../features/auth/login_screen.dart';
 import '../features/auth/signup_screen.dart';
 import '../features/auth/auth_provider.dart';
@@ -20,6 +21,7 @@ class AppRoutes {
   static const review = '/review';
   static const results = '/results';
   static const savedMeals = '/saved-meals';
+  static const history = '/history';
   static const settings = '/settings';
 }
 
@@ -82,6 +84,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.savedMeals,
         builder: (context, state) => const SavedMealsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.history,
+        builder: (context, state) => const MealHistoryScreen(),
       ),
       GoRoute(
         path: AppRoutes.settings,

@@ -22,6 +22,7 @@ except Exception:
     genai_types = None
 
 from app.db.db_factory import db
+from app.leave_tracker.db_factory import db as auth_db
 from app.models.schemas import (
     AnalyzeMealResponse,
     AnalyzeItem,
@@ -253,11 +254,36 @@ def _get_feedback_rules() -> Dict[str, FeedbackRule]:
     _feedback_rule_cache_expires_at = now + RULE_CACHE_TTL_SECONDS
     return _feedback_rule_cache
 
+def _resolve_user_feedback_policy(user_identity: Optional[str]) -> str:
+    if not user_identity or not hasattr(auth_db, "get_user_by_username"):
+        return "inherit"
 
-def _apply_feedback_rules_to_response(response: AnalyzeMealResponse) -> AnalyzeMealResponse:
+    try:
+        user = auth_db.get_user_by_username(user_identity)
+        if not user:
+            return "inherit"
+        profile = auth_db.get_nutrilens_profile(user["id"])
+        policy = str(profile.get("feedback_rules_policy", "inherit")).strip().lower()
+        if policy in ("inherit", "enabled", "disabled"):
+            return policy
+    except Exception:
+        pass
+    return "inherit"
+
+
+def _apply_feedback_rules_to_response(
+    response: AnalyzeMealResponse,
+    user_policy: str = "inherit",
+) -> AnalyzeMealResponse:
     _load_feedback_rules_state()
 
-    if not _feedback_rules_enabled:
+    apply_rules = _feedback_rules_enabled
+    if user_policy == "enabled":
+        apply_rules = True
+    elif user_policy == "disabled":
+        apply_rules = False
+
+    if not apply_rules:
         _increment_metric("feedback_rules_disabled_requests")
         return response
 
@@ -367,6 +393,30 @@ def get_feedback_rule_observability() -> Dict[str, Any]:
             "rules_applied_request_count": applied_requests,
             "rules_applied_item_count": int(_feedback_rule_metrics.get("rules_applied_item_count", 0)),
             "rule_hit_rate_pct": hit_rate_pct,
+        },
+    }
+
+
+def get_analysis_runtime_status() -> Dict[str, Any]:
+    gemini_sdk_available = genai is not None and genai_types is not None
+    gemini_configured = bool(GEMINI_API_KEY)
+    gemini_client_ready = _genai_client is not None
+    gemini_enabled = gemini_sdk_available and gemini_configured and gemini_client_ready
+
+    return {
+        "analysis_provider": "gemini" if gemini_enabled else "deterministic_fallback",
+        "gemini": {
+            "enabled": gemini_enabled,
+            "sdk_available": gemini_sdk_available,
+            "api_key_configured": gemini_configured,
+            "client_ready": gemini_client_ready,
+            "configured_model": _normalize_model_name(GEMINI_MODEL),
+            "resolved_model": resolve_gemini_model() if gemini_enabled else None,
+            "fallback_models": [_normalize_model_name(model) for model in FALLBACK_GEMINI_MODELS],
+        },
+        "feedback_rules": {
+            "enabled": _feedback_rules_enabled,
+            "configured_default_enabled": FEEDBACK_RULES_ENABLED,
         },
     }
 
@@ -580,19 +630,21 @@ def build_analysis_response_from_ai_payload(
 async def analyze_images(
     image_bytes: List[bytes],
     metadata: Dict[str, Any],
+    user_identity: Optional[str] = None,
 ) -> AnalyzeMealResponse:
     _increment_metric("analyze_requests_total")
+    user_policy = _resolve_user_feedback_policy(user_identity)
     analysis: AnalyzeMealResponse
     if GEMINI_API_KEY and _genai_client is not None and genai_types is not None:
         try:
             analysis = await analyze_images_gemini(image_bytes, metadata)
-            return _apply_feedback_rules_to_response(analysis)
+            return _apply_feedback_rules_to_response(analysis, user_policy)
         except Exception:
             # Preserve existing reliability by falling back to deterministic output.
             pass
 
     analysis = await analyze_images_deterministic(image_bytes, metadata)
-    return _apply_feedback_rules_to_response(analysis)
+    return _apply_feedback_rules_to_response(analysis, user_policy)
 
 
 async def analyze_images_gemini(

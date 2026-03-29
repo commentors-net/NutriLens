@@ -23,7 +23,7 @@ import {
 import RestaurantIcon from "@mui/icons-material/Restaurant";
 import LocalFireDepartmentIcon from "@mui/icons-material/LocalFireDepartment";
 import FitnessCenterIcon from "@mui/icons-material/FitnessCenter";
-import { mealsApi } from "@services/api";
+import { authApi, mealsApi } from "@services/api";
 import type { MealTotalResponse, Meal, MealItem } from "@services/api";
 
 export default function NutriLensMeals() {
@@ -32,32 +32,65 @@ export default function NutriLensMeals() {
   const [error, setError] = useState("");
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
   const [refreshing, setRefreshing] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [checkedAdmin, setCheckedAdmin] = useState(false);
 
   const fetchMeals = async () => {
     setRefreshing(true);
     setError("");
     try {
-      const data = await mealsApi.getTodayTotals();
+      const data = await mealsApi.getMealsByRange(selectedDate, selectedDate);
       setMealData(data);
     } catch (err: any) {
       const message = err?.response?.data?.detail || "Failed to load meals";
       setError(String(message));
     } finally {
       setRefreshing(false);
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    setLoading(true);
-    fetchMeals();
+    const checkAccessAndLoad = async () => {
+      setLoading(true);
+      const currentUsername = localStorage.getItem("username") || "";
+      if (!currentUsername) {
+        setError("No active user session");
+        setLoading(false);
+        setCheckedAdmin(true);
+        return;
+      }
+
+      try {
+        const userDetail = await authApi.getUserDetail(currentUsername, "nutrilens");
+        const admin = !!userDetail.is_admin;
+        setIsAdmin(admin);
+        setCheckedAdmin(true);
+        if (!admin) {
+          setError("Admin access required to view meal logs");
+          setLoading(false);
+          return;
+        }
+        await fetchMeals();
+      } catch (err: any) {
+        setCheckedAdmin(true);
+        const message = err?.response?.data?.detail || "Failed to verify admin access";
+        setError(String(message));
+        setLoading(false);
+      }
+    };
+
+    checkAccessAndLoad();
   }, []);
 
   const handleDateChange = (newDate: string) => {
     setSelectedDate(newDate);
+    setLoading(true);
     fetchMeals();
   };
 
   const handleRefresh = () => {
+    setLoading(true);
     fetchMeals();
   };
 
@@ -70,6 +103,14 @@ export default function NutriLensMeals() {
     return (
       <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "60vh" }}>
         <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (checkedAdmin && !isAdmin) {
+    return (
+      <Box sx={{ maxWidth: 1000, mx: "auto", mt: { xs: 2, sm: 4 }, px: { xs: 2, sm: 3 }, pb: 4 }}>
+        <Alert severity="error">{error || "Admin access required to view meal logs"}</Alert>
       </Box>
     );
   }

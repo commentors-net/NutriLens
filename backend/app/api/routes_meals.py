@@ -13,10 +13,10 @@ import csv
 import os
 from collections import Counter
 from io import StringIO, BytesIO
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import List, Optional, Literal
 
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends, Header
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from reportlab.pdfgen import canvas
@@ -24,6 +24,8 @@ from reportlab.pdfgen import canvas
 from app.db.db_factory import db
 from app.leave_tracker.db_factory import db as auth_db
 from app.leave_tracker.core.security import get_current_user
+from app.leave_tracker.core.security import jwt as auth_jwt
+from app.leave_tracker.core.security import SECRET_KEY, ALGORITHM
 from app.models.schemas import (
     AnalyzeMealResponse,
     MealTotalResponse,
@@ -31,6 +33,7 @@ from app.models.schemas import (
 )
 from app.services.analysis import (
     analyze_images,
+    get_analysis_runtime_status,
     get_feedback_rule_observability,
     set_feedback_rules_enabled,
 )
@@ -65,10 +68,65 @@ def _parse_date(date_str: str) -> datetime:
         raise HTTPException(status_code=400, detail=f"Invalid date format: {date_str}. Use YYYY-MM-DD") from exc
 
 
+def _normalize_label(value: Optional[str]) -> str:
+    return str(value or "").strip().lower()
+
+
+def _extract_correction_date(correction: dict) -> Optional[date]:
+    raw_date = str(correction.get("date_str") or "").strip()
+    if raw_date:
+        try:
+            return datetime.strptime(raw_date, "%Y-%m-%d").date()
+        except ValueError:
+            pass
+
+    raw_timestamp = str(correction.get("timestamp") or "").strip()
+    if len(raw_timestamp) >= 10:
+        try:
+            return datetime.strptime(raw_timestamp[:10], "%Y-%m-%d").date()
+        except ValueError:
+            return None
+    return None
+
+
+def _build_correction_window_summary(
+    corrections: List[dict],
+    start_date: date,
+    end_date: date,
+    days: int,
+) -> dict:
+    date_counter: Counter[str] = Counter()
+
+    for correction in corrections:
+        correction_date = _extract_correction_date(correction)
+        if correction_date is None:
+            continue
+        if correction_date < start_date or correction_date > end_date:
+            continue
+        date_counter[correction_date.isoformat()] += 1
+
+    total_corrections = sum(date_counter.values())
+    correction_rate_per_day = round(total_corrections / days, 2) if days > 0 else 0.0
+
+    return {
+        "days": days,
+        "start": start_date.isoformat(),
+        "end": end_date.isoformat(),
+        "total_corrections": total_corrections,
+        "days_with_corrections": len(date_counter),
+        "correction_rate_per_day": correction_rate_per_day,
+        "correction_frequency_by_date": [
+            {"date": d, "count": count}
+            for d, count in sorted(date_counter.items(), key=lambda item: item[0])
+        ],
+    }
+
+
 @router.post("/analyze", response_model=AnalyzeMealResponse)
 async def analyze_meal(
     images: List[UploadFile] = File(...),
     metadata: Optional[str] = Form(None),
+    authorization: Optional[str] = Header(None),
 ):
     """
     POST /meals/analyze
@@ -90,12 +148,33 @@ async def analyze_meal(
 
     image_bytes = [await img.read() for img in images]
 
+    user_identity: Optional[str] = None
+    if authorization and authorization.lower().startswith("bearer "):
+        token = authorization.split(" ", 1)[1].strip()
+        if token:
+            try:
+                payload = auth_jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+                user_identity = payload.get("sub")
+            except Exception:
+                user_identity = None
+
     try:
-        analysis = await analyze_images(image_bytes, meta_dict)
+        analysis = await analyze_images(image_bytes, meta_dict, user_identity)
         return analysis
     except Exception as e:
         logger.error(f"Analysis failed: {e}")
         raise HTTPException(status_code=500, detail="Analysis failed")
+
+
+@router.get("/analyze/runtime-status")
+async def get_analyze_runtime_status():
+    """
+    Returns the current meal-analysis runtime mode.
+
+    Useful for operational checks to confirm whether Gemini analysis is active
+    or whether deterministic fallback is currently in use.
+    """
+    return get_analysis_runtime_status()
 
 
 @router.post("/")
@@ -248,6 +327,7 @@ async def get_meal_correction_analytics(
     corrections = db.get_corrections(start_date=start, end_date=end, limit=bounded_limit)
 
     label_counter = Counter()
+    original_label_counter = Counter()
     date_counter = Counter()
     delta_sum = 0
     delta_count = 0
@@ -256,6 +336,10 @@ async def get_meal_correction_analytics(
         corrected_label = str(correction.get("corrected_label") or "").strip().lower()
         if corrected_label:
             label_counter[corrected_label] += 1
+
+        original_label = _normalize_label(correction.get("original_label"))
+        if original_label:
+            original_label_counter[original_label] += 1
 
         date_str = str(correction.get("date_str") or "").strip()
         if date_str:
@@ -271,6 +355,11 @@ async def get_meal_correction_analytics(
     top_corrected_labels = [
         {"label": label, "count": count}
         for label, count in label_counter.most_common(10)
+    ]
+
+    top_corrected_original_labels = [
+        {"original_label": label, "count": count}
+        for label, count in original_label_counter.most_common(10)
     ]
 
     by_date = [
@@ -293,10 +382,84 @@ async def get_meal_correction_analytics(
             "limit": bounded_limit,
         },
         "top_corrected_labels": top_corrected_labels,
+        "top_corrected_original_labels": top_corrected_original_labels,
         "avg_grams_delta": avg_grams_delta,
         "correction_frequency": {
             "by_date": by_date,
             "by_corrected_label": by_corrected_label,
+        },
+        "feedback_rules": get_feedback_rule_observability(),
+    }
+
+
+@router.get("/corrections/trends")
+async def get_meal_correction_trends(
+    end: Optional[str] = None,
+    top_k: int = 10,
+    limit: int = 5000,
+):
+    if end:
+        end_date = _parse_date(end).date()
+    else:
+        end_date = datetime.utcnow().date()
+
+    bounded_top_k = max(1, min(top_k, 50))
+    bounded_limit = max(1, min(limit, 10000))
+
+    start_7 = end_date - timedelta(days=6)
+    start_30 = end_date - timedelta(days=29)
+
+    if not hasattr(db, "get_corrections"):
+        return {
+            "window_end": end_date.isoformat(),
+            "window_7d": _build_correction_window_summary([], start_7, end_date, 7),
+            "window_30d": _build_correction_window_summary([], start_30, end_date, 30),
+            "top_corrected_original_labels": [],
+            "top_original_to_corrected": [],
+        }
+
+    corrections = db.get_corrections(
+        start_date=start_30.isoformat(),
+        end_date=end_date.isoformat(),
+        limit=bounded_limit,
+    )
+
+    original_label_counter: Counter[str] = Counter()
+    original_to_corrected_counter: Counter[tuple[str, str]] = Counter()
+
+    for correction in corrections:
+        original_label = _normalize_label(correction.get("original_label"))
+        corrected_label = _normalize_label(correction.get("corrected_label"))
+
+        if original_label:
+            original_label_counter[original_label] += 1
+
+        if original_label and corrected_label and original_label != corrected_label:
+            original_to_corrected_counter[(original_label, corrected_label)] += 1
+
+    top_corrected_original_labels = [
+        {"original_label": label, "count": count}
+        for label, count in original_label_counter.most_common(bounded_top_k)
+    ]
+
+    top_original_to_corrected = [
+        {
+            "original_label": original_label,
+            "corrected_label": corrected_label,
+            "count": count,
+        }
+        for (original_label, corrected_label), count
+        in original_to_corrected_counter.most_common(bounded_top_k)
+    ]
+
+    return {
+        "window_end": end_date.isoformat(),
+        "window_7d": _build_correction_window_summary(corrections, start_7, end_date, 7),
+        "window_30d": _build_correction_window_summary(corrections, start_30, end_date, 30),
+        "top_corrected_original_labels": top_corrected_original_labels,
+        "top_original_to_corrected": top_original_to_corrected,
+        "window": {
+            "limit": bounded_limit,
         },
         "feedback_rules": get_feedback_rule_observability(),
     }

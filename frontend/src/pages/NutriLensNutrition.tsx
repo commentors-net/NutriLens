@@ -28,7 +28,7 @@ import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import SearchIcon from "@mui/icons-material/Search";
-import { foodsApi } from "@services/api";
+import { authApi, foodsApi } from "@services/api";
 import type { Food, FoodCreate } from "@services/api";
 
 export default function NutriLensNutrition() {
@@ -47,6 +47,8 @@ export default function NutriLensNutrition() {
   });
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState("");
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [checkedAdmin, setCheckedAdmin] = useState(false);
 
   const fetchFoods = async () => {
     setLoading(true);
@@ -63,7 +65,35 @@ export default function NutriLensNutrition() {
   };
 
   useEffect(() => {
-    fetchFoods();
+    const checkAccessAndLoad = async () => {
+      const currentUsername = localStorage.getItem("username") || "";
+      if (!currentUsername) {
+        setError("No active user session");
+        setLoading(false);
+        setCheckedAdmin(true);
+        return;
+      }
+
+      try {
+        const userDetail = await authApi.getUserDetail(currentUsername, "nutrilens");
+        const admin = !!userDetail.is_admin;
+        setIsAdmin(admin);
+        setCheckedAdmin(true);
+        if (!admin) {
+          setError("Admin access required to manage nutrition database");
+          setLoading(false);
+          return;
+        }
+        await fetchFoods();
+      } catch (err: any) {
+        const message = err?.response?.data?.detail || "Failed to verify admin access";
+        setError(String(message));
+        setLoading(false);
+        setCheckedAdmin(true);
+      }
+    };
+
+    checkAccessAndLoad();
   }, []);
 
   const filteredFoods = foods.filter((food) =>
@@ -149,6 +179,14 @@ export default function NutriLensNutrition() {
     return (
       <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "60vh" }}>
         <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (checkedAdmin && !isAdmin) {
+    return (
+      <Box sx={{ maxWidth: 1000, mx: "auto", mt: { xs: 2, sm: 4 }, px: { xs: 2, sm: 3 }, pb: 4 }}>
+        <Alert severity="error">{error || "Admin access required to manage nutrition database"}</Alert>
       </Box>
     );
   }

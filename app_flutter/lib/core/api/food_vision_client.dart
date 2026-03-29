@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../models/analyze_response.dart';
 import '../models/daily_totals.dart';
+import '../models/meal_history.dart';
 import 'api_config.dart';
 
 class FoodVisionClient {
@@ -106,6 +107,22 @@ class FoodVisionClient {
       return json['meal_id'] as String? ?? 'saved';
     } else {
       throw Exception('Failed to save meal: ${response.statusCode}');
+    }
+  }
+
+  /// GET /meals/range?start=YYYY-MM-DD&end=YYYY-MM-DD
+  Future<MealHistoryResponse> getMealsByRange({
+    required String start,
+    required String end,
+  }) async {
+    final url = Uri.parse('$baseUrl/meals/range?start=$start&end=$end');
+    final response = await http.get(url);
+    if (response.statusCode == 200) {
+      return MealHistoryResponse.fromJson(
+        jsonDecode(response.body) as Map<String, dynamic>,
+      );
+    } else {
+      throw Exception('Failed to fetch meal history: ${response.statusCode}');
     }
   }
 }

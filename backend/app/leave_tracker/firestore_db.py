@@ -99,7 +99,9 @@ class FirestoreDB:
         """Get NutriLens profile for a user. Returns defaults if not yet configured."""
         profile_doc = self.db.collection("nutrilens_profiles").document(user_id).get()
         if profile_doc.exists:
-            return profile_doc.to_dict()
+            profile = profile_doc.to_dict()
+            profile.setdefault("feedback_rules_policy", "inherit")
+            return profile
         
         # Return default profile
         return {
@@ -112,10 +114,15 @@ class FirestoreDB:
             "breakfast_reminder_time": "08:00",
             "lunch_reminder_time": "13:00",
             "dinner_reminder_time": "19:00",
+            "feedback_rules_policy": "inherit",
         }
     
     def update_nutrilens_profile(self, user_id: str, profile: Dict[str, Any]) -> Dict[str, Any]:
         """Update NutriLens profile for a user."""
+        policy = profile.get("feedback_rules_policy", "inherit")
+        if policy not in ("inherit", "enabled", "disabled"):
+            policy = "inherit"
+
         profile_data = {
             "daily_calorie_goal": profile.get("daily_calorie_goal", 2000),
             "protein_goal_g": profile.get("protein_goal_g", 100.0),
@@ -126,6 +133,7 @@ class FirestoreDB:
             "breakfast_reminder_time": profile.get("breakfast_reminder_time", "08:00"),
             "lunch_reminder_time": profile.get("lunch_reminder_time", "13:00"),
             "dinner_reminder_time": profile.get("dinner_reminder_time", "19:00"),
+            "feedback_rules_policy": policy,
             "updated_at": datetime.now().isoformat()
         }
         self.db.collection("nutrilens_profiles").document(user_id).set(profile_data, merge=True)

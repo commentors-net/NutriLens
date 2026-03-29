@@ -72,10 +72,20 @@ class SQLiteDB:
                 breakfast_reminder_time TEXT NOT NULL DEFAULT '08:00',
                 lunch_reminder_time TEXT NOT NULL DEFAULT '13:00',
                 dinner_reminder_time TEXT NOT NULL DEFAULT '19:00',
+                feedback_rules_policy TEXT NOT NULL DEFAULT 'inherit',
                 updated_at TEXT,
                 FOREIGN KEY (user_id) REFERENCES users (id)
             )
         ''')
+
+        # Migration: add feedback_rules_policy if not present (existing databases)
+        try:
+            cursor.execute(
+                "ALTER TABLE nutrilens_profiles ADD COLUMN feedback_rules_policy TEXT NOT NULL DEFAULT 'inherit'"
+            )
+            conn.commit()
+        except Exception:
+            pass  # Column already exists
         
         # AI Instructions table
         cursor.execute('''
@@ -262,49 +272,55 @@ class SQLiteDB:
         """Get NutriLens profile for a user. Returns defaults if not yet configured."""
         conn = self._get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM nutrilens_profiles WHERE user_id = ?", (user_id,))
+        cursor.execute('SELECT * FROM nutrilens_profiles WHERE user_id = ?', (user_id,))
         row = cursor.fetchone()
         conn.close()
 
         if row:
             profile = dict(row)
             return {
-                "daily_calorie_goal": profile["daily_calorie_goal"],
-                "protein_goal_g": profile["protein_goal_g"],
-                "carbs_goal_g": profile["carbs_goal_g"],
-                "fat_goal_g": profile["fat_goal_g"],
-                "dietary_restrictions": json.loads(profile.get("dietary_restrictions") or "[]"),
-                "notifications_enabled": bool(profile.get("notifications_enabled", 0)),
-                "breakfast_reminder_time": profile.get("breakfast_reminder_time", "08:00"),
-                "lunch_reminder_time": profile.get("lunch_reminder_time", "13:00"),
-                "dinner_reminder_time": profile.get("dinner_reminder_time", "19:00"),
+                'daily_calorie_goal': profile['daily_calorie_goal'],
+                'protein_goal_g': profile['protein_goal_g'],
+                'carbs_goal_g': profile['carbs_goal_g'],
+                'fat_goal_g': profile['fat_goal_g'],
+                'dietary_restrictions': json.loads(profile.get('dietary_restrictions') or '[]'),
+                'notifications_enabled': bool(profile.get('notifications_enabled', 0)),
+                'breakfast_reminder_time': profile.get('breakfast_reminder_time', '08:00'),
+                'lunch_reminder_time': profile.get('lunch_reminder_time', '13:00'),
+                'dinner_reminder_time': profile.get('dinner_reminder_time', '19:00'),
+                'feedback_rules_policy': profile.get('feedback_rules_policy', 'inherit'),
             }
 
         return {
-            "daily_calorie_goal": 2000,
-            "protein_goal_g": 100.0,
-            "carbs_goal_g": 250.0,
-            "fat_goal_g": 65.0,
-            "dietary_restrictions": [],
-            "notifications_enabled": False,
-            "breakfast_reminder_time": "08:00",
-            "lunch_reminder_time": "13:00",
-            "dinner_reminder_time": "19:00",
+            'daily_calorie_goal': 2000,
+            'protein_goal_g': 100.0,
+            'carbs_goal_g': 250.0,
+            'fat_goal_g': 65.0,
+            'dietary_restrictions': [],
+            'notifications_enabled': False,
+            'breakfast_reminder_time': '08:00',
+            'lunch_reminder_time': '13:00',
+            'dinner_reminder_time': '19:00',
+            'feedback_rules_policy': 'inherit',
         }
 
     def update_nutrilens_profile(self, user_id: str, profile: Dict[str, Any]) -> Dict[str, Any]:
         """Create or update a user's NutriLens profile."""
+        policy = profile.get('feedback_rules_policy', 'inherit')
+        if policy not in ('inherit', 'enabled', 'disabled'):
+            policy = 'inherit'
         profile_data = {
-            "daily_calorie_goal": profile.get("daily_calorie_goal", 2000),
-            "protein_goal_g": profile.get("protein_goal_g", 100.0),
-            "carbs_goal_g": profile.get("carbs_goal_g", 250.0),
-            "fat_goal_g": profile.get("fat_goal_g", 65.0),
-            "dietary_restrictions": profile.get("dietary_restrictions", []),
-            "notifications_enabled": profile.get("notifications_enabled", False),
-            "breakfast_reminder_time": profile.get("breakfast_reminder_time", "08:00"),
-            "lunch_reminder_time": profile.get("lunch_reminder_time", "13:00"),
-            "dinner_reminder_time": profile.get("dinner_reminder_time", "19:00"),
-            "updated_at": datetime.now().isoformat(),
+            'daily_calorie_goal': profile.get('daily_calorie_goal', 2000),
+            'protein_goal_g': profile.get('protein_goal_g', 100.0),
+            'carbs_goal_g': profile.get('carbs_goal_g', 250.0),
+            'fat_goal_g': profile.get('fat_goal_g', 65.0),
+            'dietary_restrictions': profile.get('dietary_restrictions', []),
+            'notifications_enabled': profile.get('notifications_enabled', False),
+            'breakfast_reminder_time': profile.get('breakfast_reminder_time', '08:00'),
+            'lunch_reminder_time': profile.get('lunch_reminder_time', '13:00'),
+            'dinner_reminder_time': profile.get('dinner_reminder_time', '19:00'),
+            'feedback_rules_policy': policy,
+            'updated_at': datetime.now().isoformat(),
         }
 
         conn = self._get_connection()
@@ -314,9 +330,9 @@ class SQLiteDB:
             INSERT INTO nutrilens_profiles (
                 user_id, daily_calorie_goal, protein_goal_g, carbs_goal_g, fat_goal_g,
                 dietary_restrictions, notifications_enabled, breakfast_reminder_time,
-                lunch_reminder_time, dinner_reminder_time, updated_at
+                lunch_reminder_time, dinner_reminder_time, feedback_rules_policy, updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(user_id) DO UPDATE SET
                 daily_calorie_goal = excluded.daily_calorie_goal,
                 protein_goal_g = excluded.protein_goal_g,
@@ -327,26 +343,28 @@ class SQLiteDB:
                 breakfast_reminder_time = excluded.breakfast_reminder_time,
                 lunch_reminder_time = excluded.lunch_reminder_time,
                 dinner_reminder_time = excluded.dinner_reminder_time,
+                feedback_rules_policy = excluded.feedback_rules_policy,
                 updated_at = excluded.updated_at
             ''',
             (
                 user_id,
-                profile_data["daily_calorie_goal"],
-                profile_data["protein_goal_g"],
-                profile_data["carbs_goal_g"],
-                profile_data["fat_goal_g"],
-                json.dumps(profile_data["dietary_restrictions"]),
-                1 if profile_data["notifications_enabled"] else 0,
-                profile_data["breakfast_reminder_time"],
-                profile_data["lunch_reminder_time"],
-                profile_data["dinner_reminder_time"],
-                profile_data["updated_at"],
+                profile_data['daily_calorie_goal'],
+                profile_data['protein_goal_g'],
+                profile_data['carbs_goal_g'],
+                profile_data['fat_goal_g'],
+                json.dumps(profile_data['dietary_restrictions']),
+                1 if profile_data['notifications_enabled'] else 0,
+                profile_data['breakfast_reminder_time'],
+                profile_data['lunch_reminder_time'],
+                profile_data['dinner_reminder_time'],
+                profile_data['feedback_rules_policy'],
+                profile_data['updated_at'],
             ),
         )
         conn.commit()
         conn.close()
         return profile_data
-    
+
     # ==================== AI INSTRUCTIONS ====================
     
     def get_ai_instructions(self) -> Optional[Dict[str, Any]]:

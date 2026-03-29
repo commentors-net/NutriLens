@@ -505,6 +505,56 @@ export interface FeedbackRulesUpdateResponse {
   feedback_rules: FeedbackRulesStatusResponse;
 }
 
+export interface CorrectionOriginalLabelStat {
+  original_label: string;
+  count: number;
+}
+
+export interface CorrectionOriginalToCorrectedStat {
+  original_label: string;
+  corrected_label: string;
+  count: number;
+}
+
+export interface CorrectionTrendWindowSummary {
+  days: number;
+  start: string;
+  end: string;
+  total_corrections: number;
+  days_with_corrections: number;
+  correction_rate_per_day: number;
+  correction_frequency_by_date: CorrectionDateStat[];
+}
+
+export interface CorrectionsTrendsResponse {
+  window_end: string;
+  window_7d: CorrectionTrendWindowSummary;
+  window_30d: CorrectionTrendWindowSummary;
+  top_corrected_original_labels: CorrectionOriginalLabelStat[];
+  top_original_to_corrected: CorrectionOriginalToCorrectedStat[];
+  window: {
+    limit: number;
+  };
+  feedback_rules?: CorrectionsAnalyticsResponse["feedback_rules"];
+}
+
+export interface AnalysisRuntimeStatusResponse {
+  analysis_provider: "gemini" | "deterministic_fallback";
+  gemini: {
+    enabled: boolean;
+    sdk_available: boolean;
+    api_key_configured: boolean;
+    client_ready: boolean;
+    configured_model: string;
+    resolved_model: string | null;
+    fallback_models: string[];
+  };
+  feedback_rules: {
+    enabled: boolean;
+    configured_default_enabled: boolean;
+  };
+}
+
 export interface NutriLensProfileResponse {
   username: string;
   daily_calorie_goal: number;
@@ -554,6 +604,26 @@ export const mealsApi = {
         limit,
       },
     });
+    return response.data;
+  },
+
+  getCorrectionsTrends: async (
+    endDate?: string,
+    topK = 10,
+    limit = 5000,
+  ): Promise<CorrectionsTrendsResponse> => {
+    const response = await apiClient.get(`${config.apiUrl}/meals/corrections/trends`, {
+      params: {
+        end: endDate,
+        top_k: topK,
+        limit,
+      },
+    });
+    return response.data;
+  },
+
+  getAnalyzeRuntimeStatus: async (): Promise<AnalysisRuntimeStatusResponse> => {
+    const response = await apiClient.get(`${config.apiUrl}/meals/analyze/runtime-status`);
     return response.data;
   },
 

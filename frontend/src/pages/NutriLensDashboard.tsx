@@ -19,7 +19,11 @@ import {
 } from '@mui/material';
 import DownloadIcon from '@mui/icons-material/Download';
 import { mealsApi, foodsApi, authApi } from '@services/api';
-import type { CorrectionsAnalyticsResponse } from '@services/api';
+import type {
+  AnalysisRuntimeStatusResponse,
+  CorrectionsAnalyticsResponse,
+  CorrectionsTrendsResponse,
+} from '@services/api';
 
 interface GoalProgress {
   calories: number;
@@ -62,6 +66,9 @@ interface DashboardData {
     totalKcal: number;
   }>;
   correctionsAnalytics: CorrectionsAnalyticsResponse;
+  correctionTrends: CorrectionsTrendsResponse;
+  analysisRuntimeStatus: AnalysisRuntimeStatusResponse;
+  isAdmin: boolean;
 }
 
 export default function NutriLensDashboard() {
@@ -144,6 +151,7 @@ export default function NutriLensDashboard() {
         const todayStr = today.toISOString().split('T')[0];
         const startDateStr = startDate.toISOString().split('T')[0];
         const analyticsStartDateStr = analyticsStartDate.toISOString().split('T')[0];
+        const currentUsername = localStorage.getItem('username') || '';
 
         // Fetch foods count
         const foods = await foodsApi.listAll();
@@ -157,6 +165,8 @@ export default function NutriLensDashboard() {
           todayStr,
           1000,
         );
+        const correctionTrends = await mealsApi.getCorrectionsTrends(todayStr, 10, 5000);
+        const analysisRuntimeStatus = await mealsApi.getAnalyzeRuntimeStatus();
         const todayTotalKcal = todayMeals.total_kcal || 0;
         const todayMealCount = todayMeals.meal_count || 0;
         const todayTotalProtein = todayMeals.total_protein_g || 0;
@@ -165,6 +175,16 @@ export default function NutriLensDashboard() {
 
         // Fetch profile goals
         const profile = await authApi.getNutriLensProfile('nutrilens');
+
+        let isAdmin = false;
+        if (currentUsername) {
+          try {
+            const userDetail = await authApi.getUserDetail(currentUsername, 'nutrilens');
+            isAdmin = !!userDetail.is_admin;
+          } catch {
+            isAdmin = false;
+          }
+        }
 
         // Calculate today's macro percentages
         let todayAvgMacros = { protein: 0, carbs: 0, fat: 0 };
@@ -251,6 +271,9 @@ export default function NutriLensDashboard() {
           recentMeals,
           topFoods,
           correctionsAnalytics,
+          correctionTrends,
+          analysisRuntimeStatus,
+          isAdmin,
         });
       } catch (err) {
         console.error('Dashboard fetch error:', err);
@@ -511,7 +534,7 @@ export default function NutriLensDashboard() {
       <Card sx={{ mt: 4 }}>
         <CardHeader title="Correction Analytics (last 30 days)" />
         <CardContent>
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr 1fr' }, gap: 2, mb: 3 }}>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr 1fr 1fr' }, gap: 2, mb: 3 }}>
             <Card variant="outlined">
               <CardContent>
                 <Typography color="textSecondary" gutterBottom>
@@ -556,20 +579,42 @@ export default function NutriLensDashboard() {
                 <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mt: 0.5 }}>
                   Last changed: {data.correctionsAnalytics.feedback_rules?.last_change?.updated_by ?? 'n/a'}{data.correctionsAnalytics.feedback_rules?.last_change?.updated_at ? ` @ ${new Date(data.correctionsAnalytics.feedback_rules.last_change.updated_at).toLocaleString()}` : ''}
                 </Typography>
-                <Box sx={{ mt: 2 }}>
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    onClick={handleToggleFeedbackRules}
-                    disabled={updatingFeedbackRules || !data.correctionsAnalytics.feedback_rules}
-                  >
-                    {updatingFeedbackRules
-                      ? 'Updating...'
-                      : data.correctionsAnalytics.feedback_rules?.enabled
-                        ? 'Disable Auto-Adjust'
-                        : 'Enable Auto-Adjust'}
-                  </Button>
-                </Box>
+                {data.isAdmin ? (
+                  <Box sx={{ mt: 2 }}>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      onClick={handleToggleFeedbackRules}
+                      disabled={updatingFeedbackRules || !data.correctionsAnalytics.feedback_rules}
+                    >
+                      {updatingFeedbackRules
+                        ? 'Updating...'
+                        : data.correctionsAnalytics.feedback_rules?.enabled
+                          ? 'Disable Auto-Adjust'
+                          : 'Enable Auto-Adjust'}
+                    </Button>
+                  </Box>
+                ) : (
+                  <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mt: 1.5 }}>
+                    Admin permission required to change auto-adjust setting.
+                  </Typography>
+                )}
+              </CardContent>
+            </Card>
+            <Card variant="outlined">
+              <CardContent>
+                <Typography color="textSecondary" gutterBottom>
+                  Analysis Runtime
+                </Typography>
+                <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
+                  {data.analysisRuntimeStatus.analysis_provider === 'gemini' ? 'Gemini' : 'Fallback'}
+                </Typography>
+                <Typography variant="caption" color="textSecondary" sx={{ display: 'block' }}>
+                  SDK: {data.analysisRuntimeStatus.gemini.sdk_available ? 'ready' : 'missing'} · API key: {data.analysisRuntimeStatus.gemini.api_key_configured ? 'set' : 'unset'}
+                </Typography>
+                <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mt: 0.5 }}>
+                  Model: {data.analysisRuntimeStatus.gemini.resolved_model || data.analysisRuntimeStatus.gemini.configured_model}
+                </Typography>
               </CardContent>
             </Card>
           </Box>
@@ -598,6 +643,109 @@ export default function NutriLensDashboard() {
             </TableContainer>
           ) : (
             <Typography color="textSecondary">No correction data in selected window.</Typography>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card sx={{ mt: 4 }}>
+        <CardHeader title="Correction Trends (7d vs 30d)" />
+        <CardContent>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mb: 3 }}>
+            <Card variant="outlined">
+              <CardContent>
+                <Typography color="textSecondary" gutterBottom>
+                  Last 7 Days
+                </Typography>
+                <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
+                  {data.correctionTrends.window_7d.total_corrections}
+                </Typography>
+                <Typography variant="caption" color="textSecondary" sx={{ display: 'block' }}>
+                  Corrections total
+                </Typography>
+                <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mt: 0.5 }}>
+                  Rate/day: {data.correctionTrends.window_7d.correction_rate_per_day}
+                </Typography>
+                <Typography variant="caption" color="textSecondary" sx={{ display: 'block' }}>
+                  Active days: {data.correctionTrends.window_7d.days_with_corrections}
+                </Typography>
+              </CardContent>
+            </Card>
+
+            <Card variant="outlined">
+              <CardContent>
+                <Typography color="textSecondary" gutterBottom>
+                  Last 30 Days
+                </Typography>
+                <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
+                  {data.correctionTrends.window_30d.total_corrections}
+                </Typography>
+                <Typography variant="caption" color="textSecondary" sx={{ display: 'block' }}>
+                  Corrections total
+                </Typography>
+                <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mt: 0.5 }}>
+                  Rate/day: {data.correctionTrends.window_30d.correction_rate_per_day}
+                </Typography>
+                <Typography variant="caption" color="textSecondary" sx={{ display: 'block' }}>
+                  Active days: {data.correctionTrends.window_30d.days_with_corrections}
+                </Typography>
+              </CardContent>
+            </Card>
+          </Box>
+
+          <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold' }}>
+            Top Corrected Original Labels
+          </Typography>
+          {data.correctionTrends.top_corrected_original_labels.length > 0 ? (
+            <TableContainer sx={{ mb: 3 }}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Original Label</TableCell>
+                    <TableCell align="right">Corrections</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {data.correctionTrends.top_corrected_original_labels.slice(0, 10).map((entry, index) => (
+                    <TableRow key={`${entry.original_label}-${index}`}>
+                      <TableCell>{entry.original_label}</TableCell>
+                      <TableCell align="right">{entry.count}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          ) : (
+            <Typography color="textSecondary" sx={{ mb: 2 }}>
+              No corrected-original label data available.
+            </Typography>
+          )}
+
+          <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold' }}>
+            Top Original to Corrected Pairs
+          </Typography>
+          {data.correctionTrends.top_original_to_corrected.length > 0 ? (
+            <TableContainer>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Original</TableCell>
+                    <TableCell>Corrected</TableCell>
+                    <TableCell align="right">Count</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {data.correctionTrends.top_original_to_corrected.slice(0, 10).map((entry, index) => (
+                    <TableRow key={`${entry.original_label}-${entry.corrected_label}-${index}`}>
+                      <TableCell>{entry.original_label}</TableCell>
+                      <TableCell>{entry.corrected_label}</TableCell>
+                      <TableCell align="right">{entry.count}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          ) : (
+            <Typography color="textSecondary">No original-to-corrected pair data available.</Typography>
           )}
         </CardContent>
       </Card>
