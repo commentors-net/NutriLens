@@ -37,6 +37,12 @@ from app.services.analysis import (
     get_feedback_rule_observability,
     set_feedback_rules_enabled,
 )
+from app.services.meal_photo_storage import (
+    upload_meal_images,
+    resolve_meal_image_url,
+    delete_meal_image,
+)
+from app.services.app_log_storage import save_app_log
 from app.services.nutrition import get_food_fuzzy, compute_macros_from_food
 
 router = APIRouter()
@@ -45,6 +51,25 @@ logger = logging.getLogger(__name__)
 
 class FeedbackRulesToggleRequest(BaseModel):
     enabled: bool
+
+
+class MealPhotoAccessRequest(BaseModel):
+    image_urls: List[str]
+
+
+class MealPhotoDeleteRequest(BaseModel):
+    image_url: str
+
+
+class AppLogUploadRequest(BaseModel):
+    app_version: Optional[str] = None
+    platform: Optional[str] = None
+    environment: Optional[str] = None
+    session_id: Optional[str] = None
+    log_scope: Optional[str] = None
+    range_start: Optional[str] = None
+    range_end: Optional[str] = None
+    logs: str
 
 
 def _require_access_admin(current_user: str) -> None:
@@ -177,6 +202,7 @@ async def get_analyze_runtime_status():
     return get_analysis_runtime_status()
 
 
+@router.post("")
 @router.post("/")
 async def save_meal(request: SaveMealRequest):
     """
@@ -250,6 +276,7 @@ async def save_meal(request: SaveMealRequest):
         timestamp=timestamp,
         notes=request.notes,
         items=embedded_items,
+        image_urls=request.image_urls,
     )
 
     correction_count = 0
@@ -264,9 +291,213 @@ async def save_meal(request: SaveMealRequest):
         "timestamp": timestamp,
         "item_count": len(request.items),
         "total_kcal": total_kcal,
+        "image_count": len(request.image_urls or []),
         "correction_count": correction_count,
         "unmatched_labels": unmatched,
         "status": "saved",
+    }
+
+
+@router.post("/with-images")
+async def save_meal_with_images(
+    payload: str = Form(...),
+    images: List[UploadFile] = File(default_factory=list),
+):
+    """Save a meal and optionally upload attached meal photos.
+
+    Payload is JSON encoded SaveMealRequest sent as a multipart field.
+    """
+    try:
+        parsed_payload = json.loads(payload)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail="Invalid payload JSON") from exc
+
+    request = SaveMealRequest.model_validate(parsed_payload)
+
+    meal_id = str(uuid.uuid4())
+    uploaded_urls: List[str] = []
+    upload_warning: Optional[str] = None
+    if images:
+        try:
+            uploaded_urls = upload_meal_images(meal_id, images)
+        except Exception as exc:
+            logger.warning(f"Meal photo upload failed for meal {meal_id}: {exc}")
+            upload_warning = "meal_photo_upload_failed"
+
+    request_with_images = request.model_copy(
+        update={
+            "image_urls": list(request.image_urls) + uploaded_urls,
+            "timestamp": request.timestamp,
+        }
+    )
+
+    # Reuse existing save pipeline while preserving pre-generated meal_id.
+    timestamp = (request_with_images.timestamp or datetime.utcnow()).isoformat()
+
+    embedded_items: List[dict] = []
+    correction_events: List[dict] = []
+    total_kcal = 0
+    unmatched: List[str] = []
+
+    for item in request_with_images.items:
+        food = get_food_fuzzy(db, item.label)
+
+        if food is None:
+            unmatched.append(item.label)
+            macros = {
+                "kcal": item.macros.kcal,
+                "protein_g": item.macros.protein_g,
+                "carbs_g": item.macros.carbs_g,
+                "fat_g": item.macros.fat_g,
+            }
+            food_id = "unknown"
+        else:
+            macros = compute_macros_from_food(food, item.grams)
+            food_id = food.get("food_id", "unknown")
+
+        total_kcal += macros["kcal"]
+        embedded_item = {
+            "food_id": food_id,
+            "label": item.label,
+            "grams": item.grams,
+            **macros,
+        }
+
+        if item.original_label is not None:
+            embedded_item["original_label"] = item.original_label
+        if item.original_grams is not None:
+            embedded_item["original_grams"] = item.original_grams
+        if item.corrected:
+            embedded_item["corrected"] = True
+
+            corrected_grams = int(item.grams)
+            original_grams = int(item.original_grams or item.grams)
+            correction_events.append({
+                "correction_id": str(uuid.uuid4()),
+                "meal_id": meal_id,
+                "timestamp": timestamp,
+                "date_str": timestamp[:10],
+                "item_id": getattr(item, "item_id", None),
+                "corrected_label": item.label,
+                "corrected_grams": corrected_grams,
+                "original_label": item.original_label or item.label,
+                "original_grams": original_grams,
+                "grams_delta": corrected_grams - original_grams,
+            })
+
+        embedded_items.append(embedded_item)
+
+    db.save_meal(
+        meal_id=meal_id,
+        timestamp=timestamp,
+        notes=request_with_images.notes,
+        items=embedded_items,
+        image_urls=request_with_images.image_urls,
+    )
+
+    correction_count = 0
+    if correction_events and hasattr(db, "save_corrections"):
+        try:
+            correction_count = db.save_corrections(correction_events)
+        except Exception as exc:
+            logger.warning(f"Failed to persist correction events for meal_id={meal_id}: {exc}")
+
+    response = {
+        "meal_id": meal_id,
+        "timestamp": timestamp,
+        "item_count": len(request_with_images.items),
+        "total_kcal": total_kcal,
+        "image_count": len(request_with_images.image_urls),
+        "correction_count": correction_count,
+        "unmatched_labels": unmatched,
+        "status": "saved",
+    }
+    if upload_warning:
+        response["warning"] = upload_warning
+    return response
+
+
+@router.post("/photos/access")
+async def get_meal_photo_access_urls(
+    request: MealPhotoAccessRequest,
+    current_user: str = Depends(get_current_user),
+):
+    """Return browser-safe photo URLs for currently configured access mode."""
+    _ = current_user
+    resolved = []
+    errors = []
+
+    for url in request.image_urls:
+        try:
+            access_url = resolve_meal_image_url(url)
+            resolved.append({"source_url": url, "access_url": access_url})
+        except Exception as exc:
+            errors.append({"source_url": url, "error": str(exc)})
+
+    return {
+        "count": len(resolved),
+        "urls": resolved,
+        "errors": errors,
+    }
+
+
+@router.delete("/photos")
+async def delete_meal_photo(
+    request: MealPhotoDeleteRequest,
+    current_user: str = Depends(get_current_user),
+):
+    """Delete a meal photo object (admin-only cleanup endpoint)."""
+    _require_access_admin(current_user)
+    try:
+        deleted = delete_meal_image(request.image_url)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Failed to delete image: {exc}") from exc
+
+    return {
+        "status": "deleted" if deleted else "not_found",
+        "image_url": request.image_url,
+    }
+
+
+@router.post("/logs")
+async def upload_app_logs(
+    request: AppLogUploadRequest,
+    authorization: Optional[str] = Header(None),
+):
+    if not request.logs.strip():
+        raise HTTPException(status_code=400, detail="logs must not be empty")
+
+    if len(request.logs) > 500_000:
+        raise HTTPException(status_code=400, detail="logs payload too large")
+
+    user_identity: Optional[str] = None
+    if authorization and authorization.lower().startswith("bearer "):
+        token = authorization.split(" ", 1)[1].strip()
+        if token:
+            try:
+                payload = auth_jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+                user_identity = payload.get("sub")
+            except Exception:
+                user_identity = None
+
+    result = save_app_log(
+        {
+            "app_version": request.app_version,
+            "platform": request.platform,
+            "environment": request.environment,
+            "session_id": request.session_id,
+            "log_scope": request.log_scope,
+            "range_start": request.range_start,
+            "range_end": request.range_end,
+            "logs": request.logs,
+        },
+        user_identity=user_identity,
+    )
+
+    logger.info(f"Received app log upload {result.get('log_id')} stored via {result.get('storage')}")
+    return {
+        "status": "uploaded",
+        **result,
     }
 
 

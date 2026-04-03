@@ -511,6 +511,7 @@ class _SaveMealButton extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final saveState = ref.watch(saveMealProvider);
+    final imagePaths = ref.watch(captureProvider).photoPaths;
 
     return saveState.when(
       loading: () => const SizedBox(
@@ -527,7 +528,7 @@ class _SaveMealButton extends ConsumerWidget {
           const SizedBox(height: 6),
           FilledButton.icon(
             onPressed: () =>
-                ref.read(saveMealProvider.notifier).save(response),
+                ref.read(saveMealProvider.notifier).save(response, imagePaths: imagePaths),
             icon: const Icon(Icons.save),
             label: const Text('Save Meal'),
           ),
@@ -553,7 +554,7 @@ class _SaveMealButton extends ConsumerWidget {
         // Not yet saved
         return FilledButton.icon(
           onPressed: () =>
-              ref.read(saveMealProvider.notifier).save(response),
+              ref.read(saveMealProvider.notifier).save(response, imagePaths: imagePaths),
           icon: const Icon(Icons.save),
           label: const Text('Save Meal'),
         );

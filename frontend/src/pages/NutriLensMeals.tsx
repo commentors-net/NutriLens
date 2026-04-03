@@ -19,6 +19,8 @@ import {
   TableRow,
   Paper,
   Chip,
+  ImageList,
+  ImageListItem,
 } from "@mui/material";
 import RestaurantIcon from "@mui/icons-material/Restaurant";
 import LocalFireDepartmentIcon from "@mui/icons-material/LocalFireDepartment";
@@ -34,6 +36,32 @@ export default function NutriLensMeals() {
   const [refreshing, setRefreshing] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [checkedAdmin, setCheckedAdmin] = useState(false);
+  const [imageAccessMap, setImageAccessMap] = useState<Record<string, string>>({});
+
+  const resolveMealImageUrls = async (meals: Meal[]) => {
+    const rawUrls = meals.flatMap((meal) => meal.image_urls || []);
+    const uniqueUrls = Array.from(new Set(rawUrls));
+
+    if (uniqueUrls.length === 0) {
+      setImageAccessMap({});
+      return;
+    }
+
+    try {
+      const response = await mealsApi.getMealPhotoAccessUrls(uniqueUrls);
+      const nextMap: Record<string, string> = {};
+      response.urls.forEach((entry) => {
+        nextMap[entry.source_url] = entry.access_url;
+      });
+      setImageAccessMap(nextMap);
+    } catch {
+      const fallbackMap: Record<string, string> = {};
+      uniqueUrls.forEach((url) => {
+        fallbackMap[url] = url;
+      });
+      setImageAccessMap(fallbackMap);
+    }
+  };
 
   const fetchMeals = async () => {
     setRefreshing(true);
@@ -41,6 +69,7 @@ export default function NutriLensMeals() {
     try {
       const data = await mealsApi.getMealsByRange(selectedDate, selectedDate);
       setMealData(data);
+      await resolveMealImageUrls(data.meals || []);
     } catch (err: any) {
       const message = err?.response?.data?.detail || "Failed to load meals";
       setError(String(message));
@@ -116,6 +145,7 @@ export default function NutriLensMeals() {
   }
 
   const totals = mealData || { total_kcal: 0, total_protein_g: 0, total_carbs_g: 0, total_fat_g: 0, meal_count: 0, meals: [] };
+  const getDisplayImageUrl = (sourceUrl: string) => imageAccessMap[sourceUrl] || sourceUrl;
 
   return (
     <Box sx={{ maxWidth: 1200, mx: "auto", mt: { xs: 2, sm: 4 }, px: { xs: 2, sm: 3 }, pb: 4 }}>
@@ -352,6 +382,28 @@ export default function NutriLensMeals() {
                         </TableBody>
                       </Table>
                     </TableContainer>
+                  )}
+
+                  {meal.image_urls && meal.image_urls.length > 0 && (
+                    <Box>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                        Captured photos
+                      </Typography>
+                      <ImageList cols={3} gap={8} sx={{ m: 0 }}>
+                        {meal.image_urls.map((url, imageIdx) => (
+                          <ImageListItem key={`${meal.meal_id}-img-${imageIdx}`}>
+                            <a href={getDisplayImageUrl(url)} target="_blank" rel="noreferrer">
+                              <img
+                                src={getDisplayImageUrl(url)}
+                                alt={`Meal ${meal.meal_id} photo ${imageIdx + 1}`}
+                                loading="lazy"
+                                style={{ borderRadius: 8, height: 120, objectFit: "cover", width: "100%" }}
+                              />
+                            </a>
+                          </ImageListItem>
+                        ))}
+                      </ImageList>
+                    </Box>
                   )}
                 </Stack>
               </CardContent>

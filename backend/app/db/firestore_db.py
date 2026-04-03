@@ -121,6 +121,7 @@ class NutriLensFirestoreDB:
         timestamp: str,
         notes: Optional[str],
         items: List[Dict[str, Any]],
+        image_urls: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """
         Persist a meal as a single Firestore document (denormalised, items embedded).
@@ -135,6 +136,7 @@ class NutriLensFirestoreDB:
             "date_str": date_str,
             "notes": notes or "",
             "items": items,
+            "image_urls": image_urls or [],
         }
         self.db.collection(self.MEALS).document(meal_id).set(data)
         return {"id": meal_id, **data}

@@ -3,14 +3,70 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/config/environment.dart';
 import '../../core/auth/auth_service.dart';
+import '../../core/services/app_log_service.dart';
 import '../auth/auth_provider.dart';
 
-class SettingsScreen extends ConsumerWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({Key? key}) : super(key: key);
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  bool _consentGranted = false;
+  bool _consentLoaded = false;
+  bool _uploadingLogs = false;
+  LogUploadScope _logScope = LogUploadScope.today;
+  DateTime? _startDate;
+  DateTime? _endDate;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadConsent();
+  }
+
+  Future<void> _loadConsent() async {
+    final granted = await AppLogService.isUploadConsentGranted();
+    if (!mounted) return;
+    setState(() {
+      _consentGranted = granted;
+      _consentLoaded = true;
+    });
+  }
+
+  Future<void> _pickDate({required bool start}) async {
+    final initial = start ? (_startDate ?? DateTime.now()) : (_endDate ?? DateTime.now());
+    final picked = await showDatePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+      initialDate: initial,
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      if (start) {
+        _startDate = picked;
+      } else {
+        _endDate = picked;
+      }
+    });
+  }
+
+  String _fmtDate(DateTime? d) => d == null ? "Select" : d.toIso8601String().split('T').first;
+
+  bool get _canUpload {
+    if (!_consentGranted || _uploadingLogs) return false;
+    if (_logScope != LogUploadScope.range) return true;
+    if (_startDate == null || _endDate == null) return false;
+    return !_endDate!.isBefore(_startDate!);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final currentEnvironment = ref.watch(environmentProvider);
+    final apiBaseUrl = ref.watch(apiBaseUrlProvider);
     final authService = ref.watch(authServiceProvider);
     final currentUser = authService.currentUser;
 
@@ -246,6 +302,132 @@ class SettingsScreen extends ConsumerWidget {
                           ),
                         ),
                       ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Diagnostics',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Upload app logs to backend for troubleshooting.',
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 12),
+                    if (!_consentLoaded)
+                      const LinearProgressIndicator()
+                    else
+                      SwitchListTile(
+                        value: _consentGranted,
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('Participate in improving the app'),
+                        subtitle: const Text(
+                          'Allow sending diagnostic logs when you choose to upload them.',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                        onChanged: (value) async {
+                          await AppLogService.setUploadConsent(value);
+                          if (!mounted) return;
+                          setState(() => _consentGranted = value);
+                        },
+                      ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<LogUploadScope>(
+                      value: _logScope,
+                      decoration: const InputDecoration(
+                        labelText: 'Log scope',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: LogUploadScope.values
+                          .map((scope) => DropdownMenuItem(
+                                value: scope,
+                                child: Text(scope.label),
+                              ))
+                          .toList(),
+                      onChanged: _consentGranted
+                          ? (value) {
+                              if (value == null) return;
+                              setState(() => _logScope = value);
+                            }
+                          : null,
+                    ),
+                    if (_logScope == LogUploadScope.range) ...[
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: _consentGranted ? () => _pickDate(start: true) : null,
+                              child: Text('Start: ${_fmtDate(_startDate)}'),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: _consentGranted ? () => _pickDate(start: false) : null,
+                              child: Text('End: ${_fmtDate(_endDate)}'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: _canUpload
+                            ? () async {
+                                setState(() => _uploadingLogs = true);
+                                try {
+                                  final result = await AppLogService.uploadLogs(
+                                    baseUrl: apiBaseUrl,
+                                    authService: authService,
+                                    environment: currentEnvironment.displayName,
+                                    scope: _logScope,
+                                    startDate: _startDate,
+                                    endDate: _endDate,
+                                  );
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Logs uploaded: ${result['log_id']}'),
+                                        duration: const Duration(seconds: 3),
+                                      ),
+                                    );
+                                  }
+                                } catch (e) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Log upload failed: $e'),
+                                        backgroundColor: Colors.red,
+                                        duration: const Duration(seconds: 4),
+                                      ),
+                                    );
+                                  }
+                                } finally {
+                                  if (mounted) {
+                                    setState(() => _uploadingLogs = false);
+                                  }
+                                }
+                              }
+                            : null,
+                        icon: const Icon(Icons.cloud_upload),
+                        label: Text(_uploadingLogs ? 'Uploading...' : 'Upload Diagnostic Logs'),
+                      ),
                     ),
                   ],
                 ),

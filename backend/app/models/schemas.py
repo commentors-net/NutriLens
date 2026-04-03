@@ -79,6 +79,7 @@ class SaveMealRequest(BaseModel):
     items: List[MealItem]
     timestamp: Optional[datetime] = None
     notes: Optional[str] = None
+    image_urls: List[str] = Field(default_factory=list)
 
 
 class MealTotalResponse(BaseModel):

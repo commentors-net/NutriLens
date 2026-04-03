@@ -49,7 +49,8 @@ class NutriLensSQLiteDB:
                 timestamp TEXT NOT NULL,
                 date_str  TEXT NOT NULL,
                 notes     TEXT DEFAULT '',
-                items     TEXT DEFAULT '[]'
+                items     TEXT DEFAULT '[]',
+                image_urls TEXT DEFAULT '[]'
             );
 
             CREATE TABLE IF NOT EXISTS meal_corrections (
@@ -81,6 +82,14 @@ class NutriLensSQLiteDB:
             );
         """)
         conn.commit()
+
+        # Backward-compatible migration for existing local SQLite files.
+        cursor.execute("PRAGMA table_info(meals)")
+        columns = {row[1] for row in cursor.fetchall()}
+        if "image_urls" not in columns:
+            cursor.execute("ALTER TABLE meals ADD COLUMN image_urls TEXT DEFAULT '[]'")
+            conn.commit()
+
         conn.close()
 
     # ==================== FOODS ====================
@@ -228,14 +237,16 @@ class NutriLensSQLiteDB:
         timestamp: str,
         notes: Optional[str],
         items: List[Dict[str, Any]],
+        image_urls: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         date_str = timestamp[:10]
         items_json = json.dumps(items)
+        image_urls_json = json.dumps(image_urls or [])
         conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute(
-            "INSERT INTO meals (meal_id, timestamp, date_str, notes, items) VALUES (?, ?, ?, ?, ?)",
-            (meal_id, timestamp, date_str, notes or "", items_json),
+            "INSERT INTO meals (meal_id, timestamp, date_str, notes, items, image_urls) VALUES (?, ?, ?, ?, ?, ?)",
+            (meal_id, timestamp, date_str, notes or "", items_json, image_urls_json),
         )
         conn.commit()
         conn.close()
@@ -246,6 +257,7 @@ class NutriLensSQLiteDB:
             "date_str": date_str,
             "notes": notes or "",
             "items": items,
+            "image_urls": image_urls or [],
         }
 
     def get_meals_by_date(self, date_str: str) -> List[Dict[str, Any]]:
@@ -258,6 +270,7 @@ class NutriLensSQLiteDB:
         for row in rows:
             meal = dict(row)
             meal["items"] = json.loads(meal.get("items", "[]"))
+            meal["image_urls"] = json.loads(meal.get("image_urls", "[]"))
             result.append(meal)
         return result
 
@@ -275,6 +288,7 @@ class NutriLensSQLiteDB:
         for row in rows:
             meal = dict(row)
             meal["items"] = json.loads(meal.get("items", "[]"))
+            meal["image_urls"] = json.loads(meal.get("image_urls", "[]"))
             result.append(meal)
         return result
 

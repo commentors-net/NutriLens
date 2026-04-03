@@ -11,6 +11,77 @@
 
 ---
 
+## RESUME HERE - Last session: 2026-04-03 - Repo Hygiene + Meal Photo Hardening
+
+STATUS AT SESSION END (2026-04-03):
+- Completed repo hygiene pass for generated files and local deploy artifacts.
+- Added secure meal-photo access mode support (public or signed URLs).
+- Added admin cleanup endpoint for deleting meal-photo objects from GCS.
+- Updated admin meal web page to resolve display URLs through backend access endpoint.
+- Added lifecycle policy artifact for meal-photo retention cleanup.
+- Added mobile app diagnostic log upload capability (Settings -> Upload Diagnostic Logs).
+
+What was completed this session:
+1. Git ignore and tracked-artifact cleanup:
+  - Updated `.gitignore` to include Flutter/Android generated caches and deploy env files.
+  - Added explicit ignores for:
+    - `app_flutter/android/app/.cxx/`
+    - `app_flutter/android/.cxx/`
+    - `app_flutter/.dart_tool/`
+    - `app_flutter/build/`
+    - `app_flutter/android/app/build/`
+    - `app_flutter/ios/Pods/`
+    - `frontend/dist/`
+    - `frontend/.vite/`
+    - `backend/cloudrun-env*.yaml`
+  - Removed already-tracked `.cxx` files from Git index (`git rm --cached -r app_flutter/android/app/.cxx`) so ignore rules take effect.
+2. Meal photo access hardening (backend + frontend):
+  - Backend service `backend/app/services/meal_photo_storage.py` now supports:
+    - strict validation of allowed GCS meal-photo URLs
+    - signed URL generation (`NUTRILENS_MEAL_PHOTO_ACCESS_MODE=signed`)
+    - object delete helper for cleanup workflows
+  - Backend routes in `backend/app/api/routes_meals.py` added:
+    - `POST /meals/photos/access` (authenticated): resolves source URLs to browser-safe access URLs
+    - `DELETE /meals/photos` (admin-only): deletes a meal-photo object by URL
+  - Frontend API client `frontend/src/services/api.ts` added typed methods:
+    - `getMealPhotoAccessUrls(imageUrls)`
+    - `deleteMealPhoto(imageUrl)`
+  - Frontend page `frontend/src/pages/NutriLensMeals.tsx` now resolves image URLs via backend endpoint before rendering thumbnails.
+3. Retention and ops configuration:
+  - Added photo access env controls in `backend/.env.example`:
+    - `NUTRILENS_MEAL_PHOTO_BUCKET`
+    - `NUTRILENS_MEAL_PHOTO_PREFIX`
+    - `NUTRILENS_MEAL_PHOTO_ACCESS_MODE` (`public` or `signed`)
+    - `NUTRILENS_MEAL_PHOTO_SIGNED_URL_TTL_SECONDS`
+  - Added GCS lifecycle policy template:
+    - `backend/gcs-lifecycle.meal-photos.json` (delete `meal-photos/` objects older than 90 days)
+  - Suggested apply command:
+    - `gsutil lifecycle set backend/gcs-lifecycle.meal-photos.json gs://leave-tracker-2025-frontend`
+4. Pilot diagnostics support:
+  - Added backend endpoint:
+    - `POST /meals/logs` to ingest app logs from mobile clients.
+  - Added backend storage helper:
+    - `backend/app/services/app_log_storage.py` (GCS storage with local fallback).
+  - Added Flutter logger and uploader:
+    - `app_flutter/lib/core/services/app_log_service.dart`
+    - startup init in `app_flutter/lib/main.dart`
+    - UI trigger button in `app_flutter/lib/features/settings/settings_screen.dart`
+  - Added consent + scope controls in Settings:
+    - user opt-in toggle for diagnostics participation
+    - upload scope options: Today, All logs, Date range
+    - date-range picker for targeted upload windows
+  - Added backend env vars in `.env.example`:
+    - `NUTRILENS_APP_LOG_STORAGE`
+    - `NUTRILENS_APP_LOG_BUCKET`
+    - `NUTRILENS_APP_LOG_PREFIX`
+
+Recommended quick validation after deploy:
+1. Save a meal with images from mobile and verify thumbnails render on web.
+2. Set `NUTRILENS_MEAL_PHOTO_ACCESS_MODE=signed`, redeploy backend, refresh meal page, and verify photos still render.
+3. Test admin cleanup endpoint with one test image URL and confirm object removal in GCS.
+
+---
+
 ## ? RESUME HERE � Last session: 2026-03-14 � Feedback Toggle + Observability Added ?
 
 **STATUS AT SESSION END (2026-03-14):**

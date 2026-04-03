@@ -11,6 +11,62 @@ $ServiceName = "nutrilens-api"
 $RepoName   = "nutrilens-repo"
 $ImageTag   = "$Region-docker.pkg.dev/$ProjectId/$RepoName/backend:latest"
 
+$CorsOrigins = "https://storage.googleapis.com,http://localhost:5173,http://localhost:5174,http://127.0.0.1:5173,http://127.0.0.1:5174"
+$GoogleClientId = ""
+$GeminiApiKey = ""
+$NutriLensAnalysisModel = ""
+
+$existingEnv = @{}
+try {
+    $serviceJson = gcloud run services describe $ServiceName --region=$Region --project=$ProjectId --format=json | ConvertFrom-Json
+    $existingEntries = $serviceJson.spec.template.spec.containers[0].env
+    foreach ($entry in $existingEntries) {
+        if ($entry.name) {
+            $existingEnv[$entry.name] = $entry.value
+        }
+    }
+} catch {
+    $existingEnv = @{}
+}
+
+if (Test-Path "frontend/.env.production") {
+    $prodMatch = Select-String -Path "frontend/.env.production" -Pattern '^VITE_GOOGLE_CLIENT_ID=(.+)$'
+    if ($prodMatch) {
+        $GoogleClientId = $prodMatch.Matches[0].Groups[1].Value.Trim()
+    }
+}
+
+if (-not $GoogleClientId -and (Test-Path "frontend/.env.development")) {
+    $devMatch = Select-String -Path "frontend/.env.development" -Pattern '^VITE_GOOGLE_CLIENT_ID=(.+)$'
+    if ($devMatch) {
+        $GoogleClientId = $devMatch.Matches[0].Groups[1].Value.Trim()
+    }
+}
+
+if (Test-Path "backend/.env") {
+    $geminiMatch = Select-String -Path "backend/.env" -Pattern '^GEMINI_API_KEY=(.+)$'
+    if ($geminiMatch) {
+        $GeminiApiKey = $geminiMatch.Matches[0].Groups[1].Value.Trim()
+    }
+
+    $modelMatch = Select-String -Path "backend/.env" -Pattern '^NUTRILENS_ANALYSIS_MODEL=(.+)$'
+    if ($modelMatch) {
+        $NutriLensAnalysisModel = $modelMatch.Matches[0].Groups[1].Value.Trim()
+    }
+}
+
+if (-not $GoogleClientId -and $existingEnv.ContainsKey("GOOGLE_CLIENT_ID")) {
+    $GoogleClientId = [string]$existingEnv["GOOGLE_CLIENT_ID"]
+}
+
+if (-not $GeminiApiKey -and $existingEnv.ContainsKey("GEMINI_API_KEY")) {
+    $GeminiApiKey = [string]$existingEnv["GEMINI_API_KEY"]
+}
+
+if (-not $NutriLensAnalysisModel -and $existingEnv.ContainsKey("NUTRILENS_ANALYSIS_MODEL")) {
+    $NutriLensAnalysisModel = [string]$existingEnv["NUTRILENS_ANALYSIS_MODEL"]
+}
+
 # ── Step 1: Configure project ──────────────────────────────────────────────────
 Write-Host "Step 1/4: Configuring project..." -ForegroundColor Yellow
 gcloud config set project $ProjectId --quiet
@@ -45,13 +101,35 @@ Write-Host "✓ Image built successfully`n" -ForegroundColor Green
 
 # ── Step 4: Deploy to Cloud Run ───────────────────────────────────────────────
 Write-Host "Step 4/4: Deploying to Cloud Run..." -ForegroundColor Yellow
+
+$envFilePath = "backend/cloudrun-env.generated.yaml"
+$envLines = @(
+    "ENVIRONMENT: production",
+    "GCP_PROJECT_ID: $ProjectId",
+    "CORS_ORIGINS: `"$CorsOrigins`""
+)
+if ($GoogleClientId) {
+    $envLines += "GOOGLE_CLIENT_ID: $GoogleClientId"
+}
+if ($GeminiApiKey) {
+    $envLines += "GEMINI_API_KEY: $GeminiApiKey"
+}
+if ($NutriLensAnalysisModel) {
+    $envLines += "NUTRILENS_ANALYSIS_MODEL: $NutriLensAnalysisModel"
+}
+Set-Content -Path $envFilePath -Value ($envLines -join "`n") -Encoding UTF8
+
 gcloud run deploy $ServiceName `
     --image=$ImageTag `
     --region=$Region `
     --platform=managed `
-    --set-env-vars="ENVIRONMENT=production,GCP_PROJECT_ID=$ProjectId" `
+    --env-vars-file=$envFilePath `
     --allow-unauthenticated `
     --quiet
+
+if (Test-Path $envFilePath) {
+    Remove-Item $envFilePath -Force
+}
 
 if ($LASTEXITCODE -eq 0) {
     $BackendUrl = gcloud run services describe $ServiceName --region=$Region --format="value(status.url)"

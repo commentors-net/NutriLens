@@ -74,10 +74,11 @@ class FoodVisionClient {
   }
 
   /// POST /meals — save a confirmed meal built from an AnalyzeMealResponse.
-  Future<String> saveMealFromAnalysis(AnalyzeMealResponse analysis) async {
-    final url = Uri.parse('$baseUrl/meals');
-
-    final body = jsonEncode({
+  Future<String> saveMealFromAnalysis(
+    AnalyzeMealResponse analysis, {
+    List<String> imagePaths = const [],
+  }) async {
+    final payload = {
       'items': analysis.items
           .map((item) => {
                 'label': item.label,
@@ -94,19 +95,37 @@ class FoodVisionClient {
               })
           .toList(),
       'timestamp': DateTime.now().toUtc().toIso8601String(),
-    });
+      'image_urls': <String>[],
+    };
 
-    final response = await http.post(
-      url,
-      headers: {'Content-Type': 'application/json'},
-      body: body,
-    );
+    http.Response response;
+    if (imagePaths.isEmpty) {
+      final url = Uri.parse('$baseUrl/meals/');
+      response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(payload),
+      );
+    } else {
+      final url = Uri.parse('$baseUrl/meals/with-images');
+      final request = http.MultipartRequest('POST', url);
+      request.fields['payload'] = jsonEncode(payload);
+      for (final imagePath in imagePaths) {
+        final file = await http.MultipartFile.fromPath('images', imagePath);
+        request.files.add(file);
+      }
+      final streamed = await request.send();
+      final body = await streamed.stream.bytesToString();
+      response = http.Response(body, streamed.statusCode, headers: streamed.headers);
+    }
 
     if (response.statusCode == 200 || response.statusCode == 201) {
       final json = jsonDecode(response.body) as Map<String, dynamic>;
       return json['meal_id'] as String? ?? 'saved';
     } else {
-      throw Exception('Failed to save meal: ${response.statusCode}');
+      throw Exception(
+        'Failed to save meal: ${response.statusCode} - ${response.body}',
+      );
     }
   }
 

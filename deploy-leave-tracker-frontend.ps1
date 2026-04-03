@@ -121,4 +121,6 @@ if (Test-Path "$frontendPath/dist/assets") {
 }
 
 Write-Host "`nFrontend deployment completed." -ForegroundColor Green
-Write-Host "URL: https://storage.googleapis.com/$BucketName/index.html" -ForegroundColor Cyan
+Write-Host "App URL      : https://storage.googleapis.com/$BucketName/index.html" -ForegroundColor Cyan
+Write-Host "Login URL    : https://storage.googleapis.com/$BucketName/index.html#/leave-tracker/login" -ForegroundColor Cyan
+Write-Host "Note         : Bucket root URL may show XML listing; use index.html URL above for app access." -ForegroundColor Yellow

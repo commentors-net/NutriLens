@@ -1,5 +1,4 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:uuid/uuid.dart';
 import '../../core/api/food_vision_client.dart';
 import '../../core/config/environment.dart';
 import '../../core/models/analyze_response.dart';
@@ -63,15 +62,15 @@ class SaveMealNotifier extends StateNotifier<AsyncValue<String?>> {
 
   SaveMealNotifier(this._ref, this._client) : super(const AsyncValue.data(null));
 
-  Future<void> save(AnalyzeMealResponse analysis) async {
+  Future<void> save(AnalyzeMealResponse analysis, {List<String> imagePaths = const []}) async {
     state = const AsyncValue.loading();
     try {
       // Save to backend
-      final mealId = await _client.saveMealFromAnalysis(analysis);
+      final mealId = await _client.saveMealFromAnalysis(analysis, imagePaths: imagePaths);
       
       // Also save to local database
       final savedMeal = SavedMeal(
-        id: mealId ?? const Uuid().v4(),
+        id: mealId,
         name: 'Meal ${DateTime.now().toString().substring(5, 16)}',
         analyzedAt: DateTime.now(),
         items: analysis.items.map((item) => MealItem.fromJson({

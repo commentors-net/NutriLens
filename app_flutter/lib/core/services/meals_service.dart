@@ -1,5 +1,5 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:dio/dio.dart';
+import '../auth/auth_service.dart';
 
 /// Meals service with authentication enforcement
 class MealsService {
@@ -154,5 +154,3 @@ class MealsService {
   }
 }
 
-// Import needed for the provider
-import '../auth/auth_service.dart';

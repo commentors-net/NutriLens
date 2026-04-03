@@ -5,6 +5,9 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
+
+load_dotenv()
+
 from app.api.routes_meals import router as meals_router
 from app.api.routes_foods import router as foods_router
 from app.leave_tracker.api import (
@@ -17,7 +20,6 @@ from app.leave_tracker.api import (
 )
 
 logger = logging.getLogger(__name__)
-load_dotenv()
 
 # ─── Food seed data (mirrors seed.py but uses plain dicts for db_factory) ────
 from app.db.seed import FOOD_SEED_DATA as _SEED

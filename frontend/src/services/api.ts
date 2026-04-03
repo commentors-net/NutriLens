@@ -34,7 +34,8 @@ apiClient.interceptors.response.use(
       localStorage.removeItem("username");
       localStorage.removeItem("allowed_systems");
       localStorage.removeItem("selected_system");
-      window.location.href = "/login";
+      // Keep SPA routing under index.html to avoid Storage root dead links.
+      window.location.hash = "#/leave-tracker/login";
     }
     return Promise.reject(error);
   }
@@ -414,6 +415,7 @@ export interface Meal {
   items: MealItem[];
   total_kcal: number;
   notes?: string;
+  image_urls?: string[];
 }
 
 export interface MealTotalResponse {
@@ -423,6 +425,17 @@ export interface MealTotalResponse {
   total_fat_g: number;
   meal_count: number;
   meals: Meal[];
+}
+
+export interface MealPhotoAccessEntry {
+  source_url: string;
+  access_url: string;
+}
+
+export interface MealPhotoAccessResponse {
+  count: number;
+  urls: MealPhotoAccessEntry[];
+  errors: Array<{ source_url: string; error: string }>;
 }
 
 export interface CorrectionLabelStat {
@@ -635,6 +648,22 @@ export const mealsApi = {
   updateFeedbackRulesEnabled: async (enabled: boolean): Promise<FeedbackRulesUpdateResponse> => {
     const response = await apiClient.patch(`${config.apiUrl}/meals/corrections/feedback-rules`, {
       enabled,
+    });
+    return response.data;
+  },
+
+  getMealPhotoAccessUrls: async (imageUrls: string[]): Promise<MealPhotoAccessResponse> => {
+    const response = await apiClient.post(`${config.apiUrl}/meals/photos/access`, {
+      image_urls: imageUrls,
+    });
+    return response.data;
+  },
+
+  deleteMealPhoto: async (imageUrl: string): Promise<{ status: string; image_url: string }> => {
+    const response = await apiClient.delete(`${config.apiUrl}/meals/photos`, {
+      data: {
+        image_url: imageUrl,
+      },
     });
     return response.data;
   },

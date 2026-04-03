@@ -216,3 +216,15 @@ local_temp/
 temp/
 app_flutter/android/app/google-services.json
 /android/app/.cxx
+
+# Repository hygiene: generated artifacts and local deploy env files
+app_flutter/android/app/.cxx/
+app_flutter/android/.cxx/
+app_flutter/.dart_tool/
+app_flutter/build/
+app_flutter/android/app/build/
+app_flutter/ios/Pods/
+frontend/dist/
+frontend/.vite/
+backend/cloudrun-env*.yaml
+
