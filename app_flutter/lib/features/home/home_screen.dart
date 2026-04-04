@@ -16,11 +16,15 @@ class HomeScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('FoodVision'),
         actions: [
-          // Refresh button
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Refresh',
             onPressed: () => ref.invalidate(dailyTotalsProvider),
+          ),
+          IconButton(
+            icon: const Icon(Icons.settings_outlined),
+            tooltip: 'Settings',
+            onPressed: () => context.push(AppRoutes.settings),
           ),
         ],
       ),

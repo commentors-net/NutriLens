@@ -5,6 +5,7 @@ class MealHistoryItem {
   final int totalKcal;
   final List<MealHistoryFoodItem> items;
   final String notes;
+  final List<String> imageUrls;
 
   MealHistoryItem({
     required this.mealId,
@@ -13,10 +14,12 @@ class MealHistoryItem {
     required this.totalKcal,
     required this.items,
     required this.notes,
+    this.imageUrls = const [],
   });
 
   factory MealHistoryItem.fromJson(Map<String, dynamic> json) {
     final rawItems = (json['items'] as List<dynamic>? ?? []);
+    final rawImageUrls = (json['image_urls'] as List<dynamic>? ?? []);
     return MealHistoryItem(
       mealId: json['meal_id'] as String? ?? '',
       timestamp: DateTime.tryParse(json['timestamp'] as String? ?? '') ?? DateTime.now(),
@@ -27,6 +30,7 @@ class MealHistoryItem {
           .map(MealHistoryFoodItem.fromJson)
           .toList(),
       notes: json['notes'] as String? ?? '',
+      imageUrls: rawImageUrls.whereType<String>().toList(),
     );
   }
 }

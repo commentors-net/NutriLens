@@ -13,9 +13,10 @@ Document shape:
 from __future__ import annotations
 
 import os
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional
 
+from google.api_core.exceptions import FailedPrecondition
 from google.cloud import firestore
 
 
@@ -156,13 +157,29 @@ class NutriLensFirestoreDB:
         """
         Return all meals between start_date and end_date (inclusive, YYYY-MM-DD format).
         """
-        docs = (
-            self.db.collection(self.MEALS)
-            .where("date_str", ">=", start_date)
-            .where("date_str", "<=", end_date)
-            .stream()
-        )
-        meals = [{"id": d.id, **d.to_dict()} for d in docs]
+        try:
+            docs = (
+                self.db.collection(self.MEALS)
+                .where("date_str", ">=", start_date)
+                .where("date_str", "<=", end_date)
+                .stream()
+            )
+            meals = [{"id": d.id, **d.to_dict()} for d in docs]
+        except FailedPrecondition:
+            # Fallback path for environments missing the composite index.
+            start_dt = datetime.strptime(start_date, "%Y-%m-%d").date()
+            end_dt = datetime.strptime(end_date, "%Y-%m-%d").date()
+            meals: List[Dict[str, Any]] = []
+            current = start_dt
+            while current <= end_dt:
+                day = current.isoformat()
+                day_docs = (
+                    self.db.collection(self.MEALS)
+                    .where("date_str", "==", day)
+                    .stream()
+                )
+                meals.extend({"id": d.id, **d.to_dict()} for d in day_docs)
+                current += timedelta(days=1)
         meals.sort(key=lambda meal: meal.get("timestamp", ""), reverse=True)
         return meals
 

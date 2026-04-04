@@ -52,10 +52,7 @@ class _MealHistoryScreenState extends State<MealHistoryScreen> {
       firstDate: DateTime(2020, 1, 1),
       lastDate: DateTime.now(),
     );
-    if (picked == null) {
-      return;
-    }
-
+    if (picked == null) return;
     setState(() {
       if (isStart) {
         _startDate = DateTime(picked.year, picked.month, picked.day);
@@ -75,9 +72,7 @@ class _MealHistoryScreenState extends State<MealHistoryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Meal History'),
-      ),
+      appBar: AppBar(title: const Text('Meal History')),
       body: Column(
         children: [
           Padding(
@@ -89,18 +84,9 @@ class _MealHistoryScreenState extends State<MealHistoryScreen> {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    _RangeChip(
-                      label: 'Today',
-                      onTap: () => _setRange(1),
-                    ),
-                    _RangeChip(
-                      label: '7 days',
-                      onTap: () => _setRange(7),
-                    ),
-                    _RangeChip(
-                      label: '30 days',
-                      onTap: () => _setRange(30),
-                    ),
+                    _RangeChip(label: 'Today', onTap: () => _setRange(1)),
+                    _RangeChip(label: '7 days', onTap: () => _setRange(7)),
+                    _RangeChip(label: '30 days', onTap: () => _setRange(30)),
                   ],
                 ),
                 const SizedBox(height: 10),
@@ -251,30 +237,79 @@ class _DaySection extends StatelessWidget {
             const SizedBox(height: 8),
             ...meals.map((meal) {
               final time = DateFormat('HH:mm').format(meal.timestamp.toLocal());
-              return ListTile(
-                contentPadding: EdgeInsets.zero,
-                dense: true,
-                title: Text('$time  •  ${meal.totalKcal} kcal'),
-                subtitle: Text(
-                  meal.items.isEmpty
-                      ? '${meal.itemCount} item${meal.itemCount == 1 ? '' : 's'}'
-                      : meal.items
-                          .map((it) => '${it.label} (${it.grams.toStringAsFixed(0)}g)')
-                          .join(', '),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                trailing: meal.notes.trim().isNotEmpty
-                    ? Tooltip(
-                        message: meal.notes,
-                        child: const Icon(Icons.notes, size: 18),
-                      )
-                    : null,
-              );
+              return _MealTile(meal: meal, time: time);
             }),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _MealTile extends StatelessWidget {
+  final MealHistoryItem meal;
+  final String time;
+
+  const _MealTile({required this.meal, required this.time});
+
+  @override
+  Widget build(BuildContext context) {
+    final subtitle = meal.items.isEmpty
+        ? '${meal.itemCount} item${meal.itemCount == 1 ? '' : 's'}'
+        : meal.items
+            .map((it) => '${it.label} (${it.grams.toStringAsFixed(0)}g)')
+            .join(', ');
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          dense: true,
+          title: Text('$time  •  ${meal.totalKcal} kcal'),
+          subtitle: Text(
+            subtitle,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          trailing: meal.notes.trim().isNotEmpty
+              ? Tooltip(
+                  message: meal.notes,
+                  child: const Icon(Icons.notes, size: 18),
+                )
+              : null,
+        ),
+        if (meal.imageUrls.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          SizedBox(
+            height: 80,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: meal.imageUrls.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 6),
+              itemBuilder: (context, idx) {
+                final url = meal.imageUrls[idx];
+                return ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: Image.network(
+                    url,
+                    width: 80,
+                    height: 80,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      width: 80,
+                      height: 80,
+                      color: Colors.grey[200],
+                      child: const Icon(Icons.broken_image, color: Colors.grey),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 6),
+        ],
+      ],
     );
   }
 }

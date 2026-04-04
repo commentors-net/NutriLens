@@ -670,6 +670,48 @@ export const mealsApi = {
 };
 
 // ============================================
+// App Logs API (admin only)
+// ============================================
+
+export interface AppLogMeta {
+  log_id: string;
+  received_at: string | null;
+  user_identity: string | null;
+  app_version: string | null;
+  platform: string | null;
+  environment: string | null;
+  session_id: string | null;
+  log_scope: string | null;
+}
+
+export interface AppLogListResponse {
+  logs: AppLogMeta[];
+  count: number;
+}
+
+export interface AppLogDetail extends AppLogMeta {
+  logs: string;
+  range_start?: string | null;
+  range_end?: string | null;
+}
+
+export const appLogsApi = {
+  listLogs: async (date?: string, limit = 50): Promise<AppLogListResponse> => {
+    const params: Record<string, string | number> = { limit };
+    if (date) params.date = date;
+    const response = await apiClient.get(`${config.apiUrl}/meals/logs`, { params });
+    return response.data;
+  },
+
+  getLog: async (logId: string, date?: string): Promise<AppLogDetail> => {
+    const params: Record<string, string> = {};
+    if (date) params.date = date;
+    const response = await apiClient.get(`${config.apiUrl}/meals/logs/${encodeURIComponent(logId)}`, { params });
+    return response.data;
+  },
+};
+
+// ============================================
 // Foods API
 // ============================================
 

@@ -42,7 +42,7 @@ from app.services.meal_photo_storage import (
     resolve_meal_image_url,
     delete_meal_image,
 )
-from app.services.app_log_storage import save_app_log
+from app.services.app_log_storage import save_app_log, list_app_logs, get_app_log
 from app.services.nutrition import get_food_fuzzy, compute_macros_from_food
 
 router = APIRouter()
@@ -501,6 +501,39 @@ async def upload_app_logs(
     }
 
 
+@router.get("/logs")
+async def list_app_log_entries(
+    date: Optional[str] = None,
+    limit: int = 50,
+    current_user: str = Depends(get_current_user),
+):
+    """Admin-only: list uploaded app log metadata, newest first."""
+    _require_access_admin(current_user)
+    if date:
+        _parse_date(date)
+    bounded_limit = max(1, min(limit, 200))
+    logs = list_app_logs(date_str=date, limit=bounded_limit)
+    return {"logs": logs, "count": len(logs)}
+
+
+@router.get("/logs/{log_id}")
+async def get_app_log_entry(
+    log_id: str,
+    date: Optional[str] = None,
+    current_user: str = Depends(get_current_user),
+):
+    """Admin-only: retrieve the full content of an uploaded app log."""
+    _require_access_admin(current_user)
+    if not log_id.strip():
+        raise HTTPException(status_code=400, detail="log_id must not be empty")
+    if date:
+        _parse_date(date)
+    entry = get_app_log(log_id=log_id, date_str=date)
+    if entry is None:
+        raise HTTPException(status_code=404, detail="Log entry not found")
+    return entry
+
+
 @router.get("/corrections")
 async def get_meal_corrections(
     start: Optional[str] = None,
@@ -749,6 +782,7 @@ async def get_meals_today(date: Optional[str] = None):
             "total_kcal": meal_kcal,
             "items": meal.get("items", []),
             "notes": meal.get("notes", ""),
+            "image_urls": meal.get("image_urls", []),
         })
 
     return MealTotalResponse(
@@ -790,6 +824,7 @@ async def get_meals_by_range(start: str, end: str):
             "total_kcal": meal_kcal,
             "items": meal.get("items", []),
             "notes": meal.get("notes", ""),
+            "image_urls": meal.get("image_urls", []),
         })
 
     return MealTotalResponse(
@@ -882,7 +917,6 @@ async def export_meals(start: str, end: str, format: Literal["csv", "pdf"] = "cs
     pdf_buffer = BytesIO()
     pdf = canvas.Canvas(pdf_buffer)
     y = 800
-
     pdf.setFont("Helvetica-Bold", 14)
     pdf.drawString(40, y, f"NutriLens Meal Export ({start} to {end})")
     y -= 24
