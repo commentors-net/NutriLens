@@ -23,7 +23,9 @@ import type { AppLogMeta, AppLogDetail } from "@services/api";
 export default function NutriLensAppLogs() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [checkedAdmin, setCheckedAdmin] = useState(false);
-  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  const today = new Date().toISOString().split("T")[0];
+  const [startDate, setStartDate] = useState(today);
+  const [endDate, setEndDate] = useState(today);
   const [logs, setLogs] = useState<AppLogMeta[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -57,7 +59,7 @@ export default function NutriLensAppLogs() {
     setExpandedId(null);
     setDetail(null);
     try {
-      const result = await appLogsApi.listLogs(date, 50);
+      const result = await appLogsApi.listLogs(startDate, endDate, 100);
       setLogs(result.logs);
     } catch (err: any) {
       const msg = err?.response?.data?.detail || "Failed to load logs";
@@ -125,11 +127,21 @@ export default function NutriLensAppLogs() {
 
         <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems="flex-end" sx={{ mb: 3 }}>
           <TextField
-            label="Date"
+            label="Start date"
             type="date"
             size="small"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            InputLabelProps={{ shrink: true }}
+            sx={{ minWidth: 180 }}
+          />
+          <TextField
+            label="End date"
+            type="date"
+            size="small"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            inputProps={{ min: startDate }}
             InputLabelProps={{ shrink: true }}
             sx={{ minWidth: 180 }}
           />
@@ -152,7 +164,7 @@ export default function NutriLensAppLogs() {
         {!loading && error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
         {!loading && !error && logs.length === 0 && (
-          <Alert severity="info">No logs found for {date}.</Alert>
+          <Alert severity="info">No logs found for {startDate}{startDate !== endDate ? ` – ${endDate}` : ""}.</Alert>
         )}
 
         {!loading && !error && logs.length > 0 && (

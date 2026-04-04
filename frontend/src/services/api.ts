@@ -696,9 +696,10 @@ export interface AppLogDetail extends AppLogMeta {
 }
 
 export const appLogsApi = {
-  listLogs: async (date?: string, limit = 50): Promise<AppLogListResponse> => {
+  listLogs: async (start?: string, end?: string, limit = 50): Promise<AppLogListResponse> => {
     const params: Record<string, string | number> = { limit };
-    if (date) params.date = date;
+    if (start) params.start = start;
+    if (end) params.end = end;
     const response = await apiClient.get(`${config.apiUrl}/meals/logs`, { params });
     return response.data;
   },

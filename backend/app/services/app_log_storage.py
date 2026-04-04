@@ -94,13 +94,21 @@ def _extract_meta(data: Dict) -> Dict:
     }
 
 
-def list_app_logs(date_str: Optional[str] = None, limit: int = 50) -> List[Dict]:
+def list_app_logs(start_date: Optional[str] = None, end_date: Optional[str] = None, date_str: Optional[str] = None, limit: int = 50) -> List[Dict]:
     """List stored app log metadata, newest first.
 
-    ``date_str`` is an optional ISO date (YYYY-MM-DD) to filter by day.
-    When omitted, today's logs are returned for GCS; for local mode all logs
-    are returned up to *limit*.
+    ``start_date`` / ``end_date`` are ISO dates (YYYY-MM-DD).
+    When both are omitted, today's logs are returned for GCS.
+    ``date_str`` is kept for single-day back-compat (treated as start==end).
     """
+    # Normalise arguments
+    if date_str and not (start_date or end_date):
+        start_date = date_str
+        end_date = date_str
+    today = datetime.utcnow().date()
+    resolved_start = start_date or today.isoformat()
+    resolved_end = end_date or today.isoformat()
+
     if _mode() == "local":
         logs_dir = Path("backend") / "logs" / "mobile"
         if not logs_dir.exists():
@@ -110,6 +118,10 @@ def list_app_logs(date_str: Optional[str] = None, limit: int = 50) -> List[Dict]
         for f in files[:limit]:
             try:
                 data = json.loads(f.read_text(encoding="utf-8"))
+                # Filter by date range via received_at field
+                recv = (data.get("received_at") or "")[:10]
+                if recv and (recv < resolved_start or recv > resolved_end):
+                    continue
                 results.append(_extract_meta(data))
             except Exception:
                 continue
@@ -120,15 +132,25 @@ def list_app_logs(date_str: Optional[str] = None, limit: int = 50) -> List[Dict]
         bucket_name, prefix = _gcs_config()
         client = _create_storage_client()
 
-        effective_date = date_str or datetime.utcnow().strftime("%Y-%m-%d")
-        date_path = effective_date.replace("-", "/")
-        blob_prefix = f"{prefix}/{date_path}/"
+        # Collect all day prefixes in the requested range
+        start_dt = datetime.strptime(resolved_start, "%Y-%m-%d").date()
+        end_dt = datetime.strptime(resolved_end, "%Y-%m-%d").date()
+        all_blobs = []
+        current_dt = start_dt
+        while current_dt <= end_dt:
+            date_path = current_dt.isoformat().replace("-", "/")
+            day_prefix = f"{prefix}/{date_path}/"
+            try:
+                day_blobs = list(client.list_blobs(bucket_name, prefix=day_prefix))
+                all_blobs.extend(day_blobs)
+            except Exception:
+                pass
+            current_dt += timedelta(days=1)
 
-        blobs = list(client.list_blobs(bucket_name, prefix=blob_prefix, max_results=limit))
-        blobs.sort(key=lambda b: b.time_created, reverse=True)
+        all_blobs.sort(key=lambda b: b.time_created, reverse=True)
 
         results = []
-        for blob in blobs[:limit]:
+        for blob in all_blobs[:limit]:
             try:
                 data = json.loads(blob.download_as_text())
                 meta = _extract_meta(data)

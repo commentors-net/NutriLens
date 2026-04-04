@@ -503,16 +503,21 @@ async def upload_app_logs(
 
 @router.get("/logs")
 async def list_app_log_entries(
-    date: Optional[str] = None,
+    start: Optional[str] = None,
+    end: Optional[str] = None,
     limit: int = 50,
     current_user: str = Depends(get_current_user),
 ):
     """Admin-only: list uploaded app log metadata, newest first."""
     _require_access_admin(current_user)
-    if date:
-        _parse_date(date)
+    if start:
+        _parse_date(start)
+    if end:
+        _parse_date(end)
+    if start and end and start > end:
+        raise HTTPException(status_code=400, detail="start date must be on or before end date")
     bounded_limit = max(1, min(limit, 200))
-    logs = list_app_logs(date_str=date, limit=bounded_limit)
+    logs = list_app_logs(start_date=start, end_date=end, limit=bounded_limit)
     return {"logs": logs, "count": len(logs)}
 
 

@@ -10,6 +10,7 @@ load_dotenv()
 
 from app.api.routes_meals import router as meals_router
 from app.api.routes_foods import router as foods_router
+from app.api.routes_logs import router as logs_router
 from app.leave_tracker.api import (
     auth as lt_auth,
     people as lt_people,
@@ -57,6 +58,7 @@ app = FastAPI(
     version="0.3.0",
     description="Single backend hosting NutriLens and Leave Tracker services",
     lifespan=lifespan,
+    redirect_slashes=False,
 )
 
 # CORS middleware for development and production.
@@ -66,6 +68,7 @@ _default_dev_origins = [
     "http://localhost:5174",
     "http://127.0.0.1:5173",
     "http://127.0.0.1:5174",
+    "https://storage.googleapis.com",
 ]
 _raw_cors = os.getenv("CORS_ORIGINS", "")
 _env_origins = [o.strip() for o in _raw_cors.split(",") if o.strip()]
@@ -96,6 +99,8 @@ app.include_router(meals_router, prefix="/meals", tags=["meals"])
 app.include_router(meals_router, prefix="/nutrilens/meals", tags=["nutrilens-meals"])
 app.include_router(foods_router, prefix="/foods", tags=["foods"])
 app.include_router(foods_router, prefix="/nutrilens/foods", tags=["nutrilens-foods"])
+app.include_router(logs_router, prefix="/meals/logs", tags=["app-logs"])
+app.include_router(logs_router, prefix="/nutrilens/meals/logs", tags=["nutrilens-app-logs"])
 
 # Leave Tracker legacy routes (kept for current web frontend compatibility)
 app.include_router(lt_auth.router, prefix="/auth", tags=["auth"])

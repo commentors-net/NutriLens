@@ -25,6 +25,7 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+@router.get("", response_model=List[Food])
 @router.get("/", response_model=List[Food])
 async def list_foods():
     """
@@ -60,6 +61,7 @@ async def get_food(food_id: str):
         raise HTTPException(status_code=500, detail="Failed to get food")
 
 
+@router.post("", response_model=Food)
 @router.post("/", response_model=Food)
 async def create_food(data: FoodCreate):
     """
