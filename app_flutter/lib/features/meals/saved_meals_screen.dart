@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import '../../core/models/meal_draft.dart';
 import 'meals_provider.dart';
 import 'meal_detail_screen.dart';

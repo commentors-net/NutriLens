@@ -8,8 +8,12 @@ import 'core/services/app_log_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Initialize Firebase
-  await Firebase.initializeApp();
+  // Initialize Firebase (fail-safe for initial iOS dev/testing)
+  try {
+    await Firebase.initializeApp();
+  } catch (e) {
+    debugPrint('Firebase initialization notice: $e');
+  }
   await AppLogService.initialize();
 
   runApp(const ProviderScope(child: FoodVisionApp()));

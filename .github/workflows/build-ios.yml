@@ -1,0 +1,59 @@
+name: Build iOS IPA
+
+on:
+  workflow_dispatch: # Allows manual trigger from GitHub UI
+  push:
+    branches:
+      - main
+    paths:
+      - 'app_flutter/**'
+      - '.github/workflows/build-ios.yml'
+
+jobs:
+  build-ios:
+    name: Build FoodVision iOS IPA
+    runs-on: macos-14
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Check Flutter and Xcode environment
+        run: |
+          flutter doctor -v
+          xcodebuild -version
+
+      - name: Install Flutter dependencies
+        working-directory: app_flutter
+        run: flutter pub get
+
+      - name: Install CocoaPods dependencies
+        working-directory: app_flutter/ios
+        run: pod install --repo-update
+
+      - name: Build iOS Release (Unsigned)
+        working-directory: app_flutter
+        run: flutter build ios --release --no-codesign
+
+      - name: Package Runner.app into FoodVision.ipa
+        run: |
+          mkdir -p ipa_out/Payload
+          cp -R app_flutter/build/ios/iphoneos/Runner.app ipa_out/Payload/
+          cd ipa_out
+          zip -qr ../FoodVision.ipa Payload
+          cd ..
+          ls -lh FoodVision.ipa
+
+      - name: Upload FoodVision.ipa Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FoodVision-iOS-IPA
+          path: FoodVision.ipa
+          retention-days: 14

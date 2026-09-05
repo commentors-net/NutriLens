@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/models/meal_draft.dart';
 import '../../core/storage/meal_draft_db.dart';
-import '../../core/api/food_vision_client.dart';
 import '../capture/capture_controller.dart';
 import '../results/analysis_provider.dart';
 import '../../app/router.dart';
