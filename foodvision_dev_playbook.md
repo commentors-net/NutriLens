@@ -54,6 +54,9 @@ What was completed this session:
   - Untracked `app_flutter/ios/Flutter/Generated.xcconfig` from git; it contained local Windows paths (`C:\Users\puru_\...`), which caused CocoaPods on macOS runner to fail looking for podhelper.
   - Added `ENV['FLUTTER_ROOT']` fallback support in `app_flutter/ios/Podfile`.
   - Streamlined `.github/workflows/build-ios.yml` so `flutter build ios` manages CocoaPods dependencies natively.
+6. Upgraded Runner to macOS 15 + Xcode 16 for Swift AVFoundation Symbols:
+  - CocoaPods succeeded in 33s, but Xcode 15.4 failed compiling `camera_avfoundation 0.9.23+2` due to missing iOS 18 Swift notification symbols (`AVCaptureSession.wasInterruptedNotification`).
+  - Upgraded workflow runner to `macos-15` and added `maxim-lobanov/setup-xcode@v1` (`xcode-version: latest-stable`) to compile with Xcode 16+.
 
 What to do next:
 1. Monitor GitHub Actions build run (`https://github.com/commentors-net/NutriLens/actions`) and download `FoodVision.ipa`.
