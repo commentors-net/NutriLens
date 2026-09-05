@@ -56,3 +56,5 @@ flutter:
   uses-material-design: true
   assets:
     - assets/
+  config:
+    enable-swift-package-manager: false

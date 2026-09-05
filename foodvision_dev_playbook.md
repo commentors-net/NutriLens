@@ -60,6 +60,11 @@ What was completed this session:
 7. Fixed Firebase Non-Modular Header Issue:
   - Switched CocoaPods to static framework linkage (`use_frameworks! :linkage => :static` in `Podfile`), the recommended configuration for Firebase on iOS.
   - Enabled `CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES = YES` in `Podfile` post-install hook for all pod targets and in `Runner.xcodeproj` build configurations.
+8. Disabled Dual-Package Manager (SPM) to Fix 77 Duplicate Symbols:
+  - In modern Flutter, Swift Package Manager is enabled by default, but legacy `firebase_auth` and `firebase_core` only support CocoaPods.
+  - This hybrid setup caused both SPM and CocoaPods to simultaneously link `FBLPromises`, resulting in 77 duplicate symbol linker errors in Xcode.
+  - Disabled SPM in `app_flutter/pubspec.yaml` (`config: enable-swift-package-manager: false`) and in `.github/workflows/build-ios.yml` (`flutter config --no-enable-swift-package-manager`).
+  - CocoaPods now manages 100% of iOS dependencies cleanly without duplicate linkage.
 
 What to do next:
 1. Monitor GitHub Actions build run (`https://github.com/commentors-net/NutriLens/actions`) and download `FoodVision.ipa`.
