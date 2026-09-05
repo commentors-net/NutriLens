@@ -57,6 +57,9 @@ What was completed this session:
 6. Upgraded Runner to macOS 15 + Xcode 16 for Swift AVFoundation Symbols:
   - CocoaPods succeeded in 33s, but Xcode 15.4 failed compiling `camera_avfoundation 0.9.23+2` due to missing iOS 18 Swift notification symbols (`AVCaptureSession.wasInterruptedNotification`).
   - Upgraded workflow runner to `macos-15` and added `maxim-lobanov/setup-xcode@v1` (`xcode-version: latest-stable`) to compile with Xcode 16+.
+7. Fixed Firebase Non-Modular Header Issue:
+  - Switched CocoaPods to static framework linkage (`use_frameworks! :linkage => :static` in `Podfile`), the recommended configuration for Firebase on iOS.
+  - Enabled `CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES = YES` in `Podfile` post-install hook for all pod targets and in `Runner.xcodeproj` build configurations.
 
 What to do next:
 1. Monitor GitHub Actions build run (`https://github.com/commentors-net/NutriLens/actions`) and download `FoodVision.ipa`.
