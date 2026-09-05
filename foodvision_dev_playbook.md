@@ -73,11 +73,16 @@ What was completed this session:
   - Enforced `IPHONEOS_DEPLOYMENT_TARGET = 15.0` in `Runner.xcodeproj/project.pbxproj` (Debug, Release, Profile) and in `app_flutter/ios/Podfile` (`config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'` in `post_install`).
   - Cleaned up `auth_service.dart` (removed unnecessary `await` on synchronous `googleUser.authentication`) and declared direct dependency `path: ^1.9.0`.
   - Verified static analysis with `flutter analyze` (0 errors).
+10. Android Build & Cross-Platform Parity Verification:
+  - Validated Android build compatibility with the upgraded `firebase_core 3.15.2`, `firebase_auth 5.7.0`, `google_sign_in 7.2.0`, and `path 1.9.1`.
+  - Configured Flutter to use local LTS JDK 17 (`C:\Program Files\Java\jdk-17`) via `flutter config --jdk-dir` to prevent Gradle 8 incompatibility with preview Java 25.
+  - Executed full release build `flutter build apk` — successfully compiled `build/app/outputs/flutter-apk/app-release.apk` (53.7MB) with 0 errors.
+  - Confirmed both iOS IPA and Android APK build pipelines are fully operational.
 
 What to do next:
-1. Monitor GitHub Actions build run (`https://github.com/commentors-net/NutriLens/actions`) and download `FoodVision.ipa`.
-2. Sideload onto physical iPhone 15 / XS via AltStore or Sideloadly.
-3. Enable Developer Mode on iPhone (`Settings > Privacy & Security > Developer Mode`).
+1. Sideload `FoodVision.ipa` onto physical iPhone 15 / XS via AltStore or Sideloadly.
+2. Enable Developer Mode on iPhone (`Settings > Privacy & Security > Developer Mode`).
+3. Trust developer certificate on iPhone (`Settings > General > VPN & Device Management`).
 4. Perform real-world camera meal capture testing.
 
 ---
