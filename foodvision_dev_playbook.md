@@ -50,6 +50,10 @@ What was completed this session:
   - Documented signing mechanics for unsigned `.ipa` files (client-side signing via AltStore/Sideloadly).
   - Clarified background Wi-Fi auto-refresh in AltStore to eliminate 7-day expiration interruptions.
   - Outlined Developer Mode setup requirements on iOS 18.
+5. Fixed CI CocoaPods Resolution Error:
+  - Untracked `app_flutter/ios/Flutter/Generated.xcconfig` from git; it contained local Windows paths (`C:\Users\puru_\...`), which caused CocoaPods on macOS runner to fail looking for podhelper.
+  - Added `ENV['FLUTTER_ROOT']` fallback support in `app_flutter/ios/Podfile`.
+  - Streamlined `.github/workflows/build-ios.yml` so `flutter build ios` manages CocoaPods dependencies natively.
 
 What to do next:
 1. Monitor GitHub Actions build run (`https://github.com/commentors-net/NutriLens/actions`) and download `FoodVision.ipa`.

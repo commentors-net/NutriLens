@@ -12,6 +12,8 @@ project 'Runner', {
 }
 
 def flutter_root
+  return ENV['FLUTTER_ROOT'] if ENV['FLUTTER_ROOT'] && File.exist?(ENV['FLUTTER_ROOT'])
+
   generated_xcode_build_settings_path = File.expand_path(File.join(
     File.dirname(__FILE__), 'Flutter', 'Generated.xcconfig'))
   unless File.exist?(generated_xcode_build_settings_path)
