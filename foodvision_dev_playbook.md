@@ -1,4 +1,4 @@
-﻿# FoodVision App � Dev Playbook for Codex + Copilot (Flutter + FastAPI)
+# FoodVision App � Dev Playbook for Codex + Copilot (Flutter + FastAPI)
 
 **?? Multi-System Platform:** This repository (`NutriLens`) now hosts a **unified backend serving multiple applications:**
 - ??? **NutriLens** � Food photo logging + AI nutrition analysis
@@ -11,7 +11,55 @@
 
 ---
 
-## RESUME HERE - Last session: 2026-04-03 - Repo Hygiene + Meal Photo Hardening
+## RESUME HERE - Last session: 2026-09-05 - iOS Cloud Build Pipeline (GitHub Actions) + iPhone Testing Setup
+
+STATUS AT SESSION END (2026-09-05):
+- Resolved mobile testing obstacle on Windows without a Mac: enabled cloud iOS compilation via GitHub Actions.
+- Generated full iOS Xcode platform scaffolding (`Runner.xcodeproj`, `AppDelegate.swift`, launch storyboards, asset catalogs).
+- Aligned iOS bundle identifier (`com.foodvision.app`) across Android, iOS, and `app_config.yaml`.
+- Fixed CocoaPods `Podfile` bug in `app_flutter/ios/Podfile` (replaced undefined `packages_path` with `'packages'`).
+- Hardened Flutter iOS startup: wrapped `Firebase.initializeApp()` in safe try-catch to prevent splash crash if iOS plist keys are unconfigured.
+- Cleaned up unused imports in `meal_detail_screen.dart` and `saved_meals_screen.dart`.
+- Created `.github/workflows/build-ios.yml` cloud CI workflow (runs on `macos-14` Apple Silicon, compiles `--release --no-codesign`, packages `FoodVision.ipa`, and uploads as downloadable workflow artifact).
+- Committed and pushed to `main` branch on GitHub (`https://github.com/commentors-net/NutriLens.git`).
+- Documented sideloading & signing paths for iPhone 15 / XS on iOS 18 (AltStore Wi-Fi auto-refresh vs Sideloadly vs 1-year UDID services).
+
+What was completed this session:
+1. Native iOS Scaffolding Generation:
+  - Created missing native Xcode project structure in `app_flutter/ios/`:
+    - `ios/Runner.xcodeproj/project.pbxproj`
+    - `ios/Runner/AppDelegate.swift`
+    - `ios/Runner/Base.lproj/LaunchScreen.storyboard`
+    - `ios/Runner/Base.lproj/Main.storyboard`
+    - `ios/Runner/Assets.xcassets/`
+  - Updated bundle identifier to `com.foodvision.app` across all build configurations.
+  - Verified config sync: `python verify_sync.py` passes with all configurations in sync.
+2. iOS Build & Runtime Hardening:
+  - Repaired `app_flutter/ios/Podfile` line 28:
+    - Changed `File.join(packages_path, ...)` to `File.join('packages', ...)`.
+  - Updated `app_flutter/lib/main.dart` to handle Firebase initialization gracefully on iOS.
+  - Removed unused imports in `meal_detail_screen.dart` and `saved_meals_screen.dart`.
+3. Cloud Build Automation (GitHub Actions):
+  - Created `.github/workflows/build-ios.yml`:
+    - Triggers on `push` to `main` (for `app_flutter/**`) and manual `workflow_dispatch`.
+    - Uses `macos-14` runner with Flutter stable channel.
+    - Executes `flutter pub get`, `pod install`, and `flutter build ios --release --no-codesign`.
+    - Packages `Runner.app` into `FoodVision.ipa` and uploads as artifact with 14-day retention.
+  - Pushed commit `03d3013` to GitHub `origin/main`.
+4. iOS Sideloading & Testing Strategy on iOS 18:
+  - Documented signing mechanics for unsigned `.ipa` files (client-side signing via AltStore/Sideloadly).
+  - Clarified background Wi-Fi auto-refresh in AltStore to eliminate 7-day expiration interruptions.
+  - Outlined Developer Mode setup requirements on iOS 18.
+
+What to do next:
+1. Monitor GitHub Actions build run (`https://github.com/commentors-net/NutriLens/actions`) and download `FoodVision.ipa`.
+2. Sideload onto physical iPhone 15 / XS via AltStore or Sideloadly.
+3. Enable Developer Mode on iPhone (`Settings > Privacy & Security > Developer Mode`).
+4. Perform real-world camera meal capture testing.
+
+---
+
+## PREVIOUS SESSION - 2026-04-03 - Repo Hygiene + Meal Photo Hardening
 
 STATUS AT SESSION END (2026-04-03):
 - Completed repo hygiene pass for generated files and local deploy artifacts.
