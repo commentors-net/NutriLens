@@ -89,7 +89,7 @@ class AuthService {
       print('Google sign-in: account selected ${googleUser.email}');
 
       final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
+          googleUser.authentication;
 
       print(
         'Google sign-in: token fetch complete '

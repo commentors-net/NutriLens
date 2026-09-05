@@ -65,6 +65,14 @@ What was completed this session:
   - This hybrid setup caused both SPM and CocoaPods to simultaneously link `FBLPromises`, resulting in 77 duplicate symbol linker errors in Xcode.
   - Disabled SPM in `app_flutter/pubspec.yaml` (`config: enable-swift-package-manager: false`) and in `.github/workflows/build-ios.yml` (`flutter config --no-enable-swift-package-manager`).
   - CocoaPods now manages 100% of iOS dependencies cleanly without duplicate linkage.
+9. Resolved CocoaPods GoogleUtilities & RecaptchaInterop Version Conflict (Firebase SDK 11 & GoogleSignIn 9):
+  - In Build #4, CocoaPods failed resolving `GoogleUtilities/Environment` and `RecaptchaInterop`:
+    - `firebase_auth: ^4.15.0` (from 2023) pinned Firebase iOS SDK 10 (`GoogleUtilities ~> 7.8`, `RecaptchaInterop ~> 100.0`).
+    - `google_sign_in: 7.2.0` (from 2025) pinned GoogleSignIn 9 (`GoogleUtilities ~> 8.0`, `RecaptchaInterop ~> 101.0`).
+  - Upgraded `firebase_core` to `^3.6.0` (resolves to 3.15.2) and `firebase_auth` to `^5.3.0` (resolves to 5.7.0) in `app_flutter/pubspec.yaml`. Both now align on Firebase iOS SDK 11.x, which natively uses `GoogleUtilities 8.x` and `RecaptchaInterop 101.x`, completely eliminating CocoaPods dependency conflicts.
+  - Enforced `IPHONEOS_DEPLOYMENT_TARGET = 15.0` in `Runner.xcodeproj/project.pbxproj` (Debug, Release, Profile) and in `app_flutter/ios/Podfile` (`config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'` in `post_install`).
+  - Cleaned up `auth_service.dart` (removed unnecessary `await` on synchronous `googleUser.authentication`) and declared direct dependency `path: ^1.9.0`.
+  - Verified static analysis with `flutter analyze` (0 errors).
 
 What to do next:
 1. Monitor GitHub Actions build run (`https://github.com/commentors-net/NutriLens/actions`) and download `FoodVision.ipa`.
