@@ -85,12 +85,20 @@ What was completed this session:
   - Safe Firebase Startup: Populated actual project credentials in `firebase_options.dart` (`leave-tracker-2025`) and initialized Firebase with `DefaultFirebaseOptions.currentPlatform` in `main.dart`.
   - Hardened `AuthService`: Made `_firebaseAuth` a nullable getter wrapped in try/catch in `app_flutter/lib/core/auth/auth_service.dart`. Uninitialized Firebase or missing iOS configuration can no longer crash Riverpod providers (`authStateProvider`, `authNotifierProvider`, `goRouterProvider`), allowing the app to always render the UI cleanly.
   - Verified config sync (`python app_flutter/verify_sync.py`) and static analysis (`flutter analyze` - 0 errors).
+12. Resolved GitHub Secret Scanning Alert (Google API Key Remediation):
+  - GitHub Secret Scanning flagged the Firebase Google API key in `app_flutter/lib/firebase_options.dart` (commit `c5f4ad4`).
+  - Removed plaintext API key and replaced it with `String.fromEnvironment('FIREBASE_API_KEY', defaultValue: '')`.
+  - Updated `main.dart` to conditionally pass `FirebaseOptions` only when `options.apiKey.isNotEmpty`.
+  - Maintained zero-crash startup resilience across all platforms without hardcoding API keys in git.
+  - Established rule to always seek explicit user approval before triggering GitHub Actions workflows or pushing to `main`.
 
 What to do next:
-1. Sideload the updated `FoodVision.ipa` onto physical iPhone 15 / XS via iLoader / Sideloadly / AltStore.
-2. Verify home screen name displays as `FoodVision` (not `Runner`).
-3. Launch FoodVision and verify the login screen renders cleanly.
-4. Perform real-world camera meal capture testing.
+1. Review secret scanning alert resolution and close alert in GitHub Security tab.
+2. Confirm user approval before pushing fix and triggering GitHub Action build.
+3. Sideload the updated `FoodVision.ipa` onto physical iPhone 15 / XS via iLoader / Sideloadly / AltStore.
+4. Verify home screen name displays as `FoodVision` (not `Runner`).
+5. Launch FoodVision and verify the login screen renders cleanly.
+6. Perform real-world camera meal capture testing.
 
 ---
 

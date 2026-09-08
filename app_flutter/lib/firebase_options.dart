@@ -47,8 +47,13 @@ class DefaultFirebaseOptions {
     }
   }
 
+  static const String _apiKey = String.fromEnvironment(
+    'FIREBASE_API_KEY',
+    defaultValue: '',
+  );
+
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyDpAmYmO2Uo-C-mnSk_PwxsVgFdrYwEoGg',
+    apiKey: _apiKey,
     appId: '1:427212681311:android:0b4771b19134f10e0e6bea',
     messagingSenderId: '427212681311',
     projectId: 'leave-tracker-2025',
@@ -56,7 +61,7 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyDpAmYmO2Uo-C-mnSk_PwxsVgFdrYwEoGg',
+    apiKey: _apiKey,
     appId: '1:427212681311:ios:0b4771b19134f10e0e6bea',
     messagingSenderId: '427212681311',
     projectId: 'leave-tracker-2025',
