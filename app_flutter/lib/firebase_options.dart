@@ -48,19 +48,20 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyDYxxxxx', // Get from Firebase Console
-    appId: '1:xxxxxxxx:android:xxxxxxxx', // Get from Firebase Console
-    messagingSenderId: 'xxxxxxxx', // Get from Firebase Console
-    projectId: 'your-project-id', // Get from Firebase Console
-    databaseURL: 'https://your-project-id.firebaseio.com',
+    apiKey: 'AIzaSyDpAmYmO2Uo-C-mnSk_PwxsVgFdrYwEoGg',
+    appId: '1:427212681311:android:0b4771b19134f10e0e6bea',
+    messagingSenderId: '427212681311',
+    projectId: 'leave-tracker-2025',
+    storageBucket: 'leave-tracker-2025.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyDYxxxxx', // Get from Firebase Console
-    appId: '1:xxxxxxxx:ios:xxxxxxxx', // Get from Firebase Console
-    messagingSenderId: 'xxxxxxxx', // Get from Firebase Console
-    projectId: 'your-project-id', // Get from Firebase Console
-    databaseURL: 'https://your-project-id.firebaseio.com',
+    apiKey: 'AIzaSyDpAmYmO2Uo-C-mnSk_PwxsVgFdrYwEoGg',
+    appId: '1:427212681311:ios:0b4771b19134f10e0e6bea',
+    messagingSenderId: '427212681311',
+    projectId: 'leave-tracker-2025',
+    storageBucket: 'leave-tracker-2025.firebasestorage.app',
+    iosClientId: '427212681311-r4fp73b627365lbmtlnue8712i74ioe7.apps.googleusercontent.com',
     iosBundleId: 'com.foodvision.app',
   );
 }

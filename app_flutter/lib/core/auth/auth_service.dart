@@ -10,7 +10,14 @@ class AuthService {
   AuthService({required this.baseUrl});
 
   final String baseUrl;
-  final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
+  FirebaseAuth? get _firebaseAuth {
+    try {
+      return FirebaseAuth.instance;
+    } catch (e) {
+      print('FirebaseAuth not initialized: $e');
+      return null;
+    }
+  }
   final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
   bool _googleSignInInitialized = false;
   final Dio _dio = Dio();
@@ -25,21 +32,27 @@ class AuthService {
   }
 
   /// Get current user
-  User? get currentUser => _firebaseAuth.currentUser;
+  User? get currentUser {
+    try {
+      return _firebaseAuth?.currentUser;
+    } catch (_) {
+      return null;
+    }
+  }
 
   /// Check if user is authenticated
-  bool get isAuthenticated => _firebaseAuth.currentUser != null;
+  bool get isAuthenticated => currentUser != null;
 
   /// Get current user ID
-  String? get userId => _firebaseAuth.currentUser?.uid;
+  String? get userId => currentUser?.uid;
 
   /// Get current user email
-  String? get userEmail => _firebaseAuth.currentUser?.email;
+  String? get userEmail => currentUser?.email;
 
   /// Get current user ID token for API calls
   Future<String?> getIdToken() async {
     try {
-      return await _firebaseAuth.currentUser?.getIdToken();
+      return await currentUser?.getIdToken();
     } catch (e) {
       print('Error getting ID token: $e');
       return null;
@@ -51,8 +64,12 @@ class AuthService {
     required String email,
     required String password,
   }) async {
+    final auth = _firebaseAuth;
+    if (auth == null) {
+      throw Exception('Authentication service is not initialized');
+    }
     try {
-      return await _firebaseAuth.createUserWithEmailAndPassword(
+      return await auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
@@ -66,8 +83,12 @@ class AuthService {
     required String email,
     required String password,
   }) async {
+    final auth = _firebaseAuth;
+    if (auth == null) {
+      throw Exception('Authentication service is not initialized');
+    }
     try {
-      return await _firebaseAuth.signInWithEmailAndPassword(
+      return await auth.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
@@ -78,6 +99,10 @@ class AuthService {
 
   /// Sign in with Google
   Future<void> signInWithGoogle() async {
+    final auth = _firebaseAuth;
+    if (auth == null) {
+      throw Exception('Authentication service is not initialized');
+    }
     try {
       await _ensureGoogleSignInInitialized();
       print('Google sign-in: starting interactive sign-in flow');
@@ -104,7 +129,7 @@ class AuthService {
         idToken: googleAuth.idToken,
       );
 
-      final userCredential = await _firebaseAuth.signInWithCredential(credential);
+      final userCredential = await auth.signInWithCredential(credential);
       print('Google sign-in: Firebase credential sign-in succeeded for ${userCredential.user?.uid}');
     } on FirebaseAuthException catch (e) {
       throw _handleAuthException(e);
@@ -121,8 +146,9 @@ class AuthService {
   Future<void> signOut() async {
     try {
       await _ensureGoogleSignInInitialized();
+      final auth = _firebaseAuth;
       await Future.wait([
-        _firebaseAuth.signOut(),
+        if (auth != null) auth.signOut(),
         _googleSignIn.signOut(),
       ]);
     } catch (e) {
@@ -133,8 +159,12 @@ class AuthService {
 
   /// Reset password
   Future<void> resetPassword(String email) async {
+    final auth = _firebaseAuth;
+    if (auth == null) {
+      throw Exception('Authentication service is not initialized');
+    }
     try {
-      await _firebaseAuth.sendPasswordResetEmail(email: email);
+      await auth.sendPasswordResetEmail(email: email);
     } on FirebaseAuthException catch (e) {
       throw _handleAuthException(e);
     }
@@ -143,7 +173,7 @@ class AuthService {
   /// Sync user to backend database
   Future<void> syncUserToBackend() async {
     try {
-      final user = _firebaseAuth.currentUser;
+      final user = currentUser;
       if (user == null) {
         return;
       }
@@ -176,7 +206,7 @@ class AuthService {
   /// Verify user has access to NutriLens feature
   Future<bool> canAccessNutriLens() async {
     try {
-      final user = _firebaseAuth.currentUser;
+      final user = currentUser;
       if (user == null) return false;
 
       final idToken = await user.getIdToken();
@@ -228,9 +258,13 @@ final authServiceProvider = Provider((ref) {
   return AuthService(baseUrl: apiBaseUrl);
 });
 
-final authStateProvider = StreamProvider((ref) {
+final authStateProvider = StreamProvider<User?>((ref) {
   final authService = ref.watch(authServiceProvider);
-  return authService._firebaseAuth.authStateChanges();
+  final auth = authService._firebaseAuth;
+  if (auth == null) {
+    return Stream<User?>.value(null);
+  }
+  return auth.authStateChanges();
 });
 
 final currentUserProvider = Provider((ref) {

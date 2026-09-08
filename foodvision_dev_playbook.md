@@ -78,11 +78,18 @@ What was completed this session:
   - Configured Flutter to use local LTS JDK 17 (`C:\Program Files\Java\jdk-17`) via `flutter config --jdk-dir` to prevent Gradle 8 incompatibility with preview Java 25.
   - Executed full release build `flutter build apk` — successfully compiled `build/app/outputs/flutter-apk/app-release.apk` (53.7MB) with 0 errors.
   - Confirmed both iOS IPA and Android APK build pipelines are fully operational.
+11. Fixed iOS App Display Name ("Runner" -> "FoodVision") & Blank Screen Startup Crash:
+  - App Name Fix: Changed `CFBundleDisplayName` from `$(PRODUCT_NAME)` (which evaluated to Xcode target name `Runner`) to `FoodVision` in `app_flutter/ios/Runner/Info.plist`.
+  - Blank Screen Native Fix: `AppDelegate.swift` and `SceneDelegate.swift` used modern Flutter `FlutterImplicitEngineDelegate` / `FlutterSceneDelegate`, but `Info.plist` lacked `UIApplicationSceneManifest` and `UILaunchStoryboardName`. iOS was failing to connect the `UIWindowScene` and plugin registration in `didInitializeImplicitFlutterEngine` was bypassed. Added full `UIApplicationSceneManifest`, `UILaunchStoryboardName` (`LaunchScreen`), and `UIApplicationSupportsIndirectInputEvents`. Removed invalid `UIApplicationDelegate` key.
+  - Dual Lifecycle Plugin Registration: Added `GeneratedPluginRegistrant.register(with: self)` to `AppDelegate.swift` `application(_:didFinishLaunchingWithOptions:)` in addition to `didInitializeImplicitFlutterEngine` for universal backward and forward compatibility.
+  - Safe Firebase Startup: Populated actual project credentials in `firebase_options.dart` (`leave-tracker-2025`) and initialized Firebase with `DefaultFirebaseOptions.currentPlatform` in `main.dart`.
+  - Hardened `AuthService`: Made `_firebaseAuth` a nullable getter wrapped in try/catch in `app_flutter/lib/core/auth/auth_service.dart`. Uninitialized Firebase or missing iOS configuration can no longer crash Riverpod providers (`authStateProvider`, `authNotifierProvider`, `goRouterProvider`), allowing the app to always render the UI cleanly.
+  - Verified config sync (`python app_flutter/verify_sync.py`) and static analysis (`flutter analyze` - 0 errors).
 
 What to do next:
-1. Sideload `FoodVision.ipa` onto physical iPhone 15 / XS via AltStore or Sideloadly.
-2. Enable Developer Mode on iPhone (`Settings > Privacy & Security > Developer Mode`).
-3. Trust developer certificate on iPhone (`Settings > General > VPN & Device Management`).
+1. Sideload the updated `FoodVision.ipa` onto physical iPhone 15 / XS via iLoader / Sideloadly / AltStore.
+2. Verify home screen name displays as `FoodVision` (not `Runner`).
+3. Launch FoodVision and verify the login screen renders cleanly.
 4. Perform real-world camera meal capture testing.
 
 ---
