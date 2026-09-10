@@ -115,12 +115,25 @@ What was completed this session:
     - Created unit test `app_flutter/test/verify_options_test.dart` and executed with `flutter test` — All tests passed!
     - Ran `flutter analyze` — 0 errors.
     - Ran `python app_flutter/verify_sync.py` — Passed.
+15. Resolved "API_KEY_INVALID" FIRAuth Error Domain 17999 during Google Sign-In:
+  - Root Cause Diagnosed from Screenshot (`build-logs/log-image.jpeg`) and Device Log (`build-logs/iphoneXSlog.log`):
+    - Google Sign-In interactive authentication succeeded (`pranesh.sharma@gmail.com` selected, `hasIdToken=true`).
+    - However, when Firebase Auth called `auth.signInWithCredential(credential)`, Google Identity Toolkit API (`identitytoolkit.googleapis.com`) rejected the request with HTTP 400 `API_KEY_INVALID`.
+    - Investigation revealed a 1-character typo in the base64-encoded fallback string in `firebase_options.dart` (`...Sk_Rwxs...` vs `...Sk_Pwxs...`), which produced an invalid API key.
+  - Native & Dart Remediation:
+    - Updated `app_flutter/lib/firebase_options.dart`: Corrected the base64 string to `QUl6YVN5RHBBbVltTzJVby1DLW1uU2tfUHd4c1ZnRmRyWXdFb0dn`, which decodes exactly to `AIzaSyDpAmYmO2Uo-C-mnSk_PwxsVgFdrYwEoGg` (matching `google-services.json`).
+    - Verified the key directly with Google Identity Toolkit API: confirmed Google accepts the key with HTTP status handshake (`MISSING_REQUEST_URI`).
+    - Updated `app_flutter/test/verify_options_test.dart` to assert the exact 39-character key.
+  - Verification:
+    - `flutter test test/verify_options_test.dart` — All tests passed!
+    - `flutter analyze` — 0 errors.
+    - `python app_flutter/verify_sync.py` — Passed.
 
 What to do next:
 1. Confirm user approval to push commit and trigger GitHub Action workflow.
 2. Download the newly built `FoodVision.ipa` artifact from GitHub Actions.
 3. Sideload onto iPhone XS via iLoader / Sideloadly.
-4. Launch FoodVision and tap "Sign in with Google" — verify Google sign-in modal appears and completes authentication into the app.
+4. Launch FoodVision and tap "Sign in with Google" — verify authentication completes into the app successfully.
 
 ---
 

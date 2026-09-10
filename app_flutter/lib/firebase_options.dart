@@ -52,7 +52,7 @@ class DefaultFirebaseOptions {
     const envKey = String.fromEnvironment('FIREBASE_API_KEY');
     if (envKey.isNotEmpty) return envKey;
     // Decoded Firebase mobile client identifier
-    return utf8.decode(base64.decode('QUl6YVN5RHBBbVltTzJVby1DLW1uU2tfUnd4c1ZnRmRyWXdFb0dn'));
+    return utf8.decode(base64.decode('QUl6YVN5RHBBbVltTzJVby1DLW1uU2tfUHd4c1ZnRmRyWXdFb0dn'));
   }
 
   static FirebaseOptions get android => FirebaseOptions(
