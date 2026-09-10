@@ -46,7 +46,14 @@ jobs:
 
       - name: Build iOS Release (Unsigned)
         working-directory: app_flutter
-        run: flutter build ios --release --no-codesign
+        env:
+          FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+        run: |
+          if [ -n "$FIREBASE_API_KEY" ]; then
+            flutter build ios --release --no-codesign --dart-define=FIREBASE_API_KEY="$FIREBASE_API_KEY"
+          else
+            flutter build ios --release --no-codesign
+          fi
 
       - name: Package Runner.app into FoodVision.ipa
         run: |

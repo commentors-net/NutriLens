@@ -11,12 +11,9 @@ void main() async {
   
   // Initialize Firebase (fail-safe across platforms)
   try {
-    final options = DefaultFirebaseOptions.currentPlatform;
-    if (options.apiKey.isNotEmpty) {
-      await Firebase.initializeApp(options: options);
-    } else {
-      await Firebase.initializeApp();
-    }
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
   } catch (e) {
     debugPrint('Firebase initialization notice: $e');
   }
