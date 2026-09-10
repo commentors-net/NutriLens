@@ -59,3 +59,4 @@ flutter:
     - assets/
   config:
     enable-swift-package-manager: false
+    enable-uiscene-migration: false

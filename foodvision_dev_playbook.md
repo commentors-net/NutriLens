@@ -91,14 +91,24 @@ What was completed this session:
   - Updated `main.dart` to conditionally pass `FirebaseOptions` only when `options.apiKey.isNotEmpty`.
   - Maintained zero-crash startup resilience across all platforms without hardcoding API keys in git.
   - Established rule to always seek explicit user approval before triggering GitHub Actions workflows or pushing to `main`.
+13. Resolved iOS Launch-Time Crash (Reverted Experimental UIScene to Standard FlutterAppDelegate):
+  - Root Cause Diagnosed: In commit `c5f4ad4`, `UIApplicationSceneManifest` was added to `Info.plist` (enabling `UIScene` lifecycle), but in `AppDelegate.swift`, `GeneratedPluginRegistrant.register(with: self)` was also executed inside `application(_:didFinishLaunchingWithOptions:)`. Under Flutter's experimental `UIScene` lifecycle, `FlutterAppDelegate` does not have an engine or window initialized during `didFinishLaunchingWithOptions`. Calling `register(with: self)` caused plugin registrars to assert against a `nil` engine, crashing immediately on launch (`SIGABRT`).
+  - Native Code Remediation:
+    - Removed `UIApplicationSceneManifest` from `app_flutter/ios/Runner/Info.plist`.
+    - Restored standard production `FlutterAppDelegate` in `app_flutter/ios/Runner/AppDelegate.swift` without `FlutterImplicitEngineDelegate`.
+    - Deleted `app_flutter/ios/Runner/SceneDelegate.swift` from disk and removed all references from `Runner.xcodeproj/project.pbxproj`.
+    - Added `enable-uiscene-migration: false` in `app_flutter/pubspec.yaml`.
+    - Added `flutter config --no-enable-uiscene-migration` to `.github/workflows/build-ios.yml`.
+  - Maintained Display Name: Preserved `CFBundleDisplayName` and `CFBundleName` as `FoodVision`.
+  - Preserved Permissions: All camera, photo library, and network permissions remain properly configured in `Info.plist`.
+  - Verification: `python app_flutter/verify_sync.py` passed and `flutter analyze` reported 0 errors.
 
 What to do next:
-1. Review secret scanning alert resolution and close alert in GitHub Security tab.
-2. Confirm user approval before pushing fix and triggering GitHub Action build.
-3. Sideload the updated `FoodVision.ipa` onto physical iPhone 15 / XS via iLoader / Sideloadly / AltStore.
-4. Verify home screen name displays as `FoodVision` (not `Runner`).
-5. Launch FoodVision and verify the login screen renders cleanly.
-6. Perform real-world camera meal capture testing.
+1. Sideload the updated `FoodVision.ipa` artifact onto physical iPhone 15 / XS via iLoader / Sideloadly / AltStore.
+2. Verify home screen name displays as `FoodVision` (not `Runner`).
+3. Launch FoodVision and verify the login screen renders cleanly without crashing.
+4. Test permission prompts (Camera, Photo Library, Local Network) when triggered in the app.
+5. Perform real-world camera meal capture testing.
 
 ---
 
