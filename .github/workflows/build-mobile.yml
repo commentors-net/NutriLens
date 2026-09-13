@@ -166,6 +166,7 @@ jobs:
           FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
         run: |
           flutter build apk --release \
+            --android-skip-build-dependency-validation \
             --build-name="${{ needs.version.outputs.version_name }}" \
             --build-number="${{ needs.version.outputs.version_code }}"
 
@@ -175,6 +176,7 @@ jobs:
           FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
         run: |
           flutter build appbundle --release \
+            --android-skip-build-dependency-validation \
             --build-name="${{ needs.version.outputs.version_name }}" \
             --build-number="${{ needs.version.outputs.version_code }}"
 
