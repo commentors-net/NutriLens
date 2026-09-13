@@ -1,6 +1,6 @@
-/// API configuration.
-/// Environment is now dynamically selected via environment provider.
-/// See lib/core/config/environment.dart for details.
+// API configuration.
+// Environment is now dynamically selected via environment provider.
+// See lib/core/config/environment.dart for details.
 
 // Backward-compatible default while providers inject the active environment URL.
 const String kBackendBaseUrl = kBackendBaseUrlProd;

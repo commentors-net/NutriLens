@@ -1,4 +1,4 @@
-/// Dart model for GET /meals/today response.
+// Dart model for GET /meals/today response.
 
 class DailyTotals {
   final int totalKcal;

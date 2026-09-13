@@ -108,9 +108,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ListTile(
                       title: const Text('Live (Cloud)'),
                       subtitle: const Text('https://nutrilens-api-2ajzj2dbrq-uc.a.run.app'),
+                      // ignore: deprecated_member_use
                       leading: Radio<AppEnvironment>(
                         value: AppEnvironment.live,
+                        // ignore: deprecated_member_use
                         groupValue: currentEnvironment,
+                        // ignore: deprecated_member_use
                         onChanged: (value) {
                           if (value != null) {
                             ref
@@ -137,9 +140,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ListTile(
                       title: const Text('Debug (Localhost)'),
                       subtitle: const Text('http://10.0.2.2:8000 (Android Emulator)'),
+                      // ignore: deprecated_member_use
                       leading: Radio<AppEnvironment>(
                         value: AppEnvironment.debug,
+                        // ignore: deprecated_member_use
                         groupValue: currentEnvironment,
+                        // ignore: deprecated_member_use
                         onChanged: (value) {
                           if (value != null) {
                             ref
@@ -364,7 +370,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<LogUploadScope>(
-                      value: _logScope,
+                      initialValue: _logScope,
                       decoration: const InputDecoration(
                         labelText: 'Log scope',
                         border: OutlineInputBorder(),

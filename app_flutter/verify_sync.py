@@ -4,14 +4,24 @@ Version Sync Verification Script
 Ensures Android and iOS configurations are in sync with pubspec.yaml
 """
 
+import io
 import re
 import sys
 from pathlib import Path
 
+# Ensure UTF-8 output on Windows consoles
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    except AttributeError:
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
 def read_pubspec_version():
     """Read version from pubspec.yaml"""
     pubspec_path = Path(__file__).parent / 'pubspec.yaml'
-    with open(pubspec_path, 'r') as f:
+    with open(pubspec_path, 'r', encoding='utf-8') as f:
         content = f.read()
         match = re.search(r'version:\s*(\d+\.\d+\.\d+)\+(\d+)', content)
         if match:
@@ -21,21 +31,25 @@ def read_pubspec_version():
 def read_android_config():
     """Read Android configuration"""
     gradle_path = Path(__file__).parent / 'android' / 'app' / 'build.gradle'
-    with open(gradle_path, 'r') as f:
+    with open(gradle_path, 'r', encoding='utf-8') as f:
         content = f.read()
         app_id = re.search(r'applicationId\s+"([^"]+)"', content)
-        min_sdk = re.search(r'minSdkVersion\s+(\d+)', content)
-        target_sdk = re.search(r'targetSdkVersion\s+(\d+)', content)
+        min_sdk = re.search(r'minSdk(?:Version)?\s+([^\r\n]+)', content)
+        target_sdk = re.search(r'targetSdk(?:Version)?\s+([^\r\n]+)', content)
+        version_code = re.search(r'versionCode\s+([^\r\n]+)', content)
+        version_name = re.search(r'versionName\s+([^\r\n]+)', content)
         return {
             'app_id': app_id.group(1) if app_id else None,
-            'min_sdk': min_sdk.group(1) if min_sdk else None,
-            'target_sdk': target_sdk.group(1) if target_sdk else None,
+            'min_sdk': min_sdk.group(1).strip() if min_sdk else None,
+            'target_sdk': target_sdk.group(1).strip() if target_sdk else None,
+            'version_code': version_code.group(1).strip() if version_code else None,
+            'version_name': version_name.group(1).strip() if version_name else None,
         }
 
 def read_ios_config():
     """Read iOS configuration"""
     info_plist_path = Path(__file__).parent / 'ios' / 'Runner' / 'Info.plist'
-    with open(info_plist_path, 'r') as f:
+    with open(info_plist_path, 'r', encoding='utf-8') as f:
         content = f.read()
         bundle_id = re.search(r'<key>CFBundleIdentifier</key>\s*<string>\$\(PRODUCT_BUNDLE_IDENTIFIER\)</string>', content)
         version = re.search(r'<key>CFBundleShortVersionString</key>\s*<string>\$\(FLUTTER_BUILD_NAME\)</string>', content)
@@ -50,9 +64,10 @@ def read_app_config():
     """Read app_config.yaml"""
     config_path = Path(__file__).parent / 'app_config.yaml'
     config = {}
-    with open(config_path, 'r') as f:
+    with open(config_path, 'r', encoding='utf-8') as f:
         for line in f:
-            if ':' in line and not line.strip().startswith('#'):
+            line = line.split('#', 1)[0].strip()
+            if ':' in line:
                 key, value = line.split(':', 1)
                 config[key.strip()] = value.strip().strip('"').strip("'")
     return config
@@ -79,6 +94,8 @@ def main():
     print(f"  Application ID: {android_config['app_id']}")
     print(f"  Min SDK: {android_config['min_sdk']}")
     print(f"  Target SDK: {android_config['target_sdk']}")
+    print(f"  Version Name: {android_config['version_name']} (dynamically mapped to {version_name})")
+    print(f"  Version Code: {android_config['version_code']} (dynamically mapped to {version_code})")
     
     if android_config['app_id'] != app_config.get('package_name'):
         errors.append(f"❌ Android applicationId mismatch: {android_config['app_id']} != {app_config.get('package_name')}")
@@ -86,6 +103,8 @@ def main():
     # Check iOS
     print(f"\n🍎 iOS Configuration:")
     print(f"  Uses Flutter Variables: {ios_config['uses_flutter_vars']}")
+    print(f"  Version Name (CFBundleShortVersionString): $(FLUTTER_BUILD_NAME) -> {version_name}")
+    print(f"  Version Code (CFBundleVersion): $(FLUTTER_BUILD_NUMBER) -> {version_code}")
     print(f"  Min iOS Version: {ios_config['min_ios']}")
     
     if not ios_config['uses_flutter_vars']:

@@ -28,7 +28,7 @@ void main() async {
 }
 
 class FoodVisionApp extends ConsumerWidget {
-  const FoodVisionApp({Key? key}) : super(key: key);
+  const FoodVisionApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

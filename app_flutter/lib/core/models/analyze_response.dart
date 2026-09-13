@@ -1,5 +1,5 @@
-/// Strongly-typed models for analyze meal response.
-/// Corresponds to shared/schemas/analyze_meal_response.schema.json
+// Strongly-typed models for analyze meal response.
+// Corresponds to shared/schemas/analyze_meal_response.schema.json
 
 class AnalyzeMealResponse {
   final double overallConfidence;
