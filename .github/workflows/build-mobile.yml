@@ -80,7 +80,7 @@ jobs:
   build-android:
     name: Build Android (APK & AAB)
     needs: version
-    if: ${{ inputs.build_android != false }}
+    if: ${{ github.event_name == 'push' || inputs.build_android == true }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -180,27 +180,27 @@ jobs:
 
       - name: Rename artifacts
         run: |
-          cp app_flutter/build/app/outputs/flutter-apk/app-release.apk FoodVision-v${{ needs.version.outputs.full_version }}.apk
-          cp app_flutter/build/app/outputs/bundle/release/app-release.aab FoodVision-v${{ needs.version.outputs.full_version }}.aab
+          cp app_flutter/build/app/outputs/flutter-apk/app-release.apk FoodVision-v${{ needs.version.outputs.version_name }}-b${{ needs.version.outputs.version_code }}.apk
+          cp app_flutter/build/app/outputs/bundle/release/app-release.aab FoodVision-v${{ needs.version.outputs.version_name }}-b${{ needs.version.outputs.version_code }}.aab
 
       - name: Upload Android APK
         uses: actions/upload-artifact@v4
         with:
-          name: FoodVision-v${{ needs.version.outputs.full_version }}-Android-APK
-          path: FoodVision-v${{ needs.version.outputs.full_version }}.apk
+          name: FoodVision-v${{ needs.version.outputs.version_name }}-b${{ needs.version.outputs.version_code }}-Android-APK
+          path: FoodVision-v${{ needs.version.outputs.version_name }}-b${{ needs.version.outputs.version_code }}.apk
           retention-days: 14
 
       - name: Upload Android AAB
         uses: actions/upload-artifact@v4
         with:
-          name: FoodVision-v${{ needs.version.outputs.full_version }}-Android-AAB
-          path: FoodVision-v${{ needs.version.outputs.full_version }}.aab
+          name: FoodVision-v${{ needs.version.outputs.version_name }}-b${{ needs.version.outputs.version_code }}-Android-AAB
+          path: FoodVision-v${{ needs.version.outputs.version_name }}-b${{ needs.version.outputs.version_code }}.aab
           retention-days: 14
 
   build-ios:
     name: Build iOS (IPA)
     needs: version
-    if: ${{ inputs.build_ios != false }}
+    if: ${{ github.event_name == 'push' || inputs.build_ios == true }}
     runs-on: macos-15
     timeout-minutes: 45
 
@@ -254,15 +254,15 @@ jobs:
           mkdir -p ipa_out/Payload
           cp -R app_flutter/build/ios/iphoneos/Runner.app ipa_out/Payload/
           cd ipa_out
-          zip -qr ../FoodVision-v${{ needs.version.outputs.full_version }}.ipa Payload
+          zip -qr ../FoodVision-v${{ needs.version.outputs.version_name }}-b${{ needs.version.outputs.version_code }}.ipa Payload
           cd ..
-          ls -lh FoodVision-v${{ needs.version.outputs.full_version }}.ipa
+          ls -lh FoodVision-v${{ needs.version.outputs.version_name }}-b${{ needs.version.outputs.version_code }}.ipa
 
       - name: Upload FoodVision iOS IPA
         uses: actions/upload-artifact@v4
         with:
-          name: FoodVision-v${{ needs.version.outputs.full_version }}-iOS-IPA
-          path: FoodVision-v${{ needs.version.outputs.full_version }}.ipa
+          name: FoodVision-v${{ needs.version.outputs.version_name }}-b${{ needs.version.outputs.version_code }}-iOS-IPA
+          path: FoodVision-v${{ needs.version.outputs.version_name }}-b${{ needs.version.outputs.version_code }}.ipa
           retention-days: 14
 
   summary:
@@ -283,9 +283,9 @@ jobs:
 
           | Platform | Artifact | Status |
           | :--- | :--- | :--- |
-          | Android APK | `FoodVision-v${{ needs.version.outputs.full_version }}.apk` | ${{ needs.build-android.result }} |
-          | Android AAB | `FoodVision-v${{ needs.version.outputs.full_version }}.aab` | ${{ needs.build-android.result }} |
-          | iOS IPA | `FoodVision-v${{ needs.version.outputs.full_version }}.ipa` | ${{ needs.build-ios.result }} |
+          | Android APK | `FoodVision-v${{ needs.version.outputs.version_name }}-b${{ needs.version.outputs.version_code }}.apk` | ${{ needs.build-android.result }} |
+          | Android AAB | `FoodVision-v${{ needs.version.outputs.version_name }}-b${{ needs.version.outputs.version_code }}.aab` | ${{ needs.build-android.result }} |
+          | iOS IPA | `FoodVision-v${{ needs.version.outputs.version_name }}-b${{ needs.version.outputs.version_code }}.ipa` | ${{ needs.build-ios.result }} |
 
           *Artifacts are retained for 14 days and can be downloaded from the run artifacts section.*
           EOF

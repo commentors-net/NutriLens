@@ -204,3 +204,55 @@ def test_analyze_is_deterministic_for_same_payload():
     assert r1.status_code == 200
     assert r2.status_code == 200
     assert r1.json()["items"][0]["label"] == r2.json()["items"][0]["label"]
+
+
+# ---------------------------------------------------------------------------
+# Consensus synthesis tests
+# ---------------------------------------------------------------------------
+
+
+def test_synthesize_consensus_endpoint_merges_cloud_and_local():
+    """POST /meals/synthesize successfully arbitrates cloud and local LLM evaluations."""
+    payload = {
+        "cloud_analysis": {
+            "items": [
+                {
+                    "label": "chicken breast",
+                    "grams_estimate": 150,
+                    "label_confidence": 0.88,
+                    "grams_confidence": 0.70,
+                }
+            ],
+            "overall_confidence": 0.85,
+        },
+        "local_analysis": {
+            "items": [
+                {
+                    "label": "olive oil",
+                    "grams_estimate": 15,
+                    "label_confidence": 0.82,
+                    "grams_confidence": 0.75,
+                }
+            ],
+            "notes": "Detected glossy oil sheen on surface of chicken breast.",
+        },
+        "notes": "User verified olive oil was used in cooking.",
+    }
+
+    response = client.post("/meals/synthesize", json=payload)
+    assert response.status_code == 200
+
+    data = response.json()
+    assert "consensus_summary" in data
+    assert "adjustments_made" in data
+    assert "items" in data
+    assert "total_macros" in data
+    assert len(data["items"]) >= 2
+
+    labels = [item["label"].lower() for item in data["items"]]
+    assert "chicken breast" in labels
+    assert "olive oil" in labels
+
+    assert data["total_macros"]["kcal"] > 0
+    assert data["total_macros"]["fat_g"] > 0
+

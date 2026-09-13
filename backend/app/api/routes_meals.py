@@ -30,9 +30,12 @@ from app.models.schemas import (
     AnalyzeMealResponse,
     MealTotalResponse,
     SaveMealRequest,
+    SynthesizeMealRequest,
+    SynthesizeMealResponse,
 )
 from app.services.analysis import (
     analyze_images,
+    synthesize_consensus_analysis,
     get_analysis_runtime_status,
     get_feedback_rule_observability,
     set_feedback_rules_enabled,
@@ -200,6 +203,42 @@ async def get_analyze_runtime_status():
     or whether deterministic fallback is currently in use.
     """
     return get_analysis_runtime_status()
+
+
+@router.post("/synthesize", response_model=SynthesizeMealResponse)
+async def synthesize_meal_endpoint(
+    request: SynthesizeMealRequest,
+    authorization: Optional[str] = Header(None),
+):
+    """
+    POST /meals/synthesize
+
+    Arbitrates and synthesizes consensus between Cloud Gemini analysis and Local Ollama Vision analysis.
+    If meal_id is provided, optionally updates the saved meal in the database with the consensus items and metadata.
+    """
+    try:
+        response = await synthesize_consensus_analysis(
+            cloud_analysis=request.cloud_analysis,
+            local_analysis=request.local_analysis,
+            notes=request.notes,
+        )
+
+        if request.meal_id and hasattr(db, "update_meal_consensus"):
+            try:
+                db.update_meal_consensus(
+                    meal_id=request.meal_id,
+                    items=[item.model_dump() for item in response.items],
+                    consensus_summary=response.consensus_summary,
+                    adjustments_made=response.adjustments_made,
+                    total_macros=response.total_macros.model_dump(),
+                )
+            except Exception as exc:
+                logger.warning(f"Could not persist consensus to meal {request.meal_id}: {exc}")
+
+        return response
+    except Exception as e:
+        logger.error(f"Consensus synthesis failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Consensus synthesis failed: {str(e)}")
 
 
 @router.post("")

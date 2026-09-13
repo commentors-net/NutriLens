@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:foodvision/core/models/analyze_response.dart';
 import 'package:foodvision/core/models/daily_totals.dart';
 import 'package:foodvision/core/models/meal_history.dart';
+import 'package:foodvision/core/models/synthesize_response.dart';
 import 'package:foodvision/core/auth/auth_service.dart';
 import 'package:foodvision/core/config/environment.dart';
 import 'package:foodvision/core/utils/device_info.dart';
@@ -188,6 +189,38 @@ class FoodVisionClient {
       return response.bodyBytes;
     } else {
       throw Exception('Failed to export meals: ${response.statusCode}');
+    }
+  }
+
+  /// POST /meals/synthesize — Reconcile initial cloud analysis with local LLM analysis
+  Future<SynthesizeMealResponse> synthesizeMeal({
+    String? mealId,
+    required Map<String, dynamic> cloudAnalysis,
+    required Map<String, dynamic> localAnalysis,
+    String? notes,
+  }) async {
+    final url = Uri.parse('$baseUrl/meals/synthesize');
+    final authHeaders = await _getAuthHeaders();
+    authHeaders['Content-Type'] = 'application/json';
+
+    final payload = {
+      'meal_id': mealId,
+      'cloud_analysis': cloudAnalysis,
+      'local_analysis': localAnalysis,
+      'notes': notes,
+    };
+
+    final response = await http.post(
+      url,
+      headers: authHeaders,
+      body: jsonEncode(payload),
+    );
+
+    if (response.statusCode == 200) {
+      final json = jsonDecode(response.body) as Map<String, dynamic>;
+      return SynthesizeMealResponse.fromJson(json);
+    } else {
+      throw Exception('Failed to synthesize consensus: ${response.statusCode} - ${response.body}');
     }
   }
 }

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:foodvision/core/config/environment.dart';
 import 'package:foodvision/core/auth/auth_service.dart';
 import 'package:foodvision/core/services/app_log_service.dart';
+import 'package:foodvision/core/services/local_ai_service.dart';
 import 'package:foodvision/features/auth/auth_provider.dart';
 import 'package:foodvision/app/router.dart';
 
@@ -22,10 +23,75 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   DateTime? _startDate;
   DateTime? _endDate;
 
+  // Local AI (Ollama) state
+  bool _localAiEnabled = true;
+  late final TextEditingController _localAiUrlController;
+  late final TextEditingController _localAiModelController;
+  bool _testingLocalAi = false;
+  String? _localAiStatus;
+  bool? _localAiReachable;
+  List<String> _availableLocalModels = [];
+
   @override
   void initState() {
     super.initState();
+    _localAiUrlController = TextEditingController(text: LocalAiService.kDefaultUrl);
+    _localAiModelController = TextEditingController(text: LocalAiService.kDefaultModel);
     _loadConsent();
+    _loadLocalAiSettings();
+  }
+
+  @override
+  void dispose() {
+    _localAiUrlController.dispose();
+    _localAiModelController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadLocalAiSettings() async {
+    final localAi = ref.read(localAiServiceProvider);
+    final enabled = await localAi.isEnabled();
+    final url = await localAi.getBaseUrl();
+    final model = await localAi.getSelectedModel();
+    if (!mounted) return;
+    setState(() {
+      _localAiEnabled = enabled;
+      _localAiUrlController.text = url;
+      _localAiModelController.text = model;
+    });
+  }
+
+  Future<void> _testLocalAiConnection() async {
+    setState(() {
+      _testingLocalAi = true;
+      _localAiStatus = null;
+      _localAiReachable = null;
+    });
+
+    final localAi = ref.read(localAiServiceProvider);
+    final url = _localAiUrlController.text.trim();
+    final reachable = await localAi.checkReachability(urlOverride: url);
+    List<String> models = [];
+    if (reachable) {
+      models = await localAi.fetchModels(urlOverride: url);
+      await localAi.setBaseUrl(url);
+      await localAi.setEnabled(_localAiEnabled);
+      if (_localAiModelController.text.isNotEmpty) {
+        await localAi.setSelectedModel(_localAiModelController.text.trim());
+      }
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _testingLocalAi = false;
+      _localAiReachable = reachable;
+      _availableLocalModels = models;
+      if (reachable) {
+        _localAiStatus = 'Connected to Ollama! Found ${models.length} model(s).';
+      } else {
+        _localAiStatus = 'Could not connect to $url on LAN. Verify Ollama is running with OLLAMA_HOST=0.0.0.0.';
+      }
+    });
   }
 
   Future<void> _loadConsent() async {
@@ -204,6 +270,156 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 subtitle: const Text('Set calorie & macro targets, dietary restrictions, and reminders'),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => context.push(AppRoutes.profile),
+              ),
+            ),
+            const SizedBox(height: 16),
+            // Local AI (Ollama) Section
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const CircleAvatar(
+                          backgroundColor: Colors.indigo,
+                          foregroundColor: Colors.white,
+                          child: Icon(Icons.hub),
+                        ),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Local AI Agent (Ollama)',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Text(
+                                'Deep multimodal second opinion on your LAN',
+                                style: TextStyle(fontSize: 12, color: Colors.grey),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Switch(
+                          value: _localAiEnabled,
+                          onChanged: (val) async {
+                            setState(() => _localAiEnabled = val);
+                            await ref.read(localAiServiceProvider).setEnabled(val);
+                          },
+                        ),
+                      ],
+                    ),
+                    if (_localAiEnabled) ...[
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: _localAiUrlController,
+                        decoration: const InputDecoration(
+                          labelText: 'Ollama LAN Endpoint',
+                          hintText: 'http://192.168.0.200:11434',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.lan),
+                        ),
+                        onChanged: (val) {
+                          ref.read(localAiServiceProvider).setBaseUrl(val);
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      if (_availableLocalModels.isNotEmpty)
+                        DropdownButtonFormField<String>(
+                          initialValue: _availableLocalModels.contains(_localAiModelController.text)
+                              ? _localAiModelController.text
+                              : _availableLocalModels.first,
+                          decoration: const InputDecoration(
+                            labelText: 'Installed Vision Model',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.model_training),
+                          ),
+                          items: _availableLocalModels
+                              .map((m) => DropdownMenuItem(value: m, child: Text(m)))
+                              .toList(),
+                          onChanged: (val) {
+                            if (val != null) {
+                              _localAiModelController.text = val;
+                              ref.read(localAiServiceProvider).setSelectedModel(val);
+                            }
+                          },
+                        )
+                      else
+                        TextField(
+                          controller: _localAiModelController,
+                          decoration: const InputDecoration(
+                            labelText: 'Vision Model Name',
+                            hintText: 'llama3.2-vision',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.model_training),
+                          ),
+                          onChanged: (val) {
+                            ref.read(localAiServiceProvider).setSelectedModel(val);
+                          },
+                        ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: _testingLocalAi ? null : _testLocalAiConnection,
+                          icon: _testingLocalAi
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Icons.network_check),
+                          label: Text(_testingLocalAi ? 'Pinging Ollama...' : 'Test LAN Connection'),
+                        ),
+                      ),
+                      if (_localAiStatus != null) ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: _localAiReachable == true
+                                ? Colors.green.shade50
+                                : Colors.red.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: _localAiReachable == true
+                                  ? Colors.green.shade300
+                                  : Colors.red.shade300,
+                            ),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(
+                                _localAiReachable == true ? Icons.check_circle : Icons.error,
+                                size: 16,
+                                color: _localAiReachable == true ? Colors.green : Colors.red,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  _localAiStatus!,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: _localAiReachable == true
+                                        ? Colors.green.shade900
+                                        : Colors.red.shade900,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 16),

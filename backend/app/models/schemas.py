@@ -119,3 +119,22 @@ class FoodUpdate(BaseModel):
     carbs_per_100g: Optional[float] = None
     fat_per_100g: Optional[float] = None
 
+
+class SynthesizeMealRequest(BaseModel):
+    """Request to arbitrate and synthesize initial cloud analysis with local LLM analysis"""
+    meal_id: Optional[str] = None
+    cloud_analysis: Dict[str, Any]
+    local_analysis: Dict[str, Any]
+    notes: Optional[str] = None
+
+
+class SynthesizeMealResponse(BaseModel):
+    """Response containing synthesized consensus items and arbitration rationale"""
+    consensus_summary: str
+    adjustments_made: List[str] = Field(default_factory=list)
+    items: List[AnalyzeItem]
+    total_macros: Macros
+    overall_confidence: float
+    consensus_method: str = "gemini_arbitrated_consensus"
+
+

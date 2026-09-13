@@ -42,6 +42,10 @@ class AnalysisNotifier extends StateNotifier<AsyncValue<AnalyzeMealResponse?>> {
     state = AsyncValue.data(current.copyWith(items: updatedItems));
   }
 
+  void updateWithResponse(AnalyzeMealResponse newResponse) {
+    state = AsyncValue.data(newResponse);
+  }
+
   void reset() => state = const AsyncValue.data(null);
 }
 

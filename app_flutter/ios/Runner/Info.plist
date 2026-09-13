@@ -55,6 +55,13 @@
 	<string>FoodVision needs permission to save photos to your library.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>FoodVision needs access to communicate with the local network.</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>

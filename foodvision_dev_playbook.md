@@ -42,11 +42,18 @@
   - Created central release log `VERSION_HISTORY.md` at repository root tracking all mobile versions, build codes, dates, and triggers.
   - Implemented unified GitHub Action `.github/workflows/build-mobile.yml` that builds both Android (APK & AAB) and iOS (IPA) under the same release execution and synchronizes their version names and codes.
   - Retired single-platform `.github/workflows/build-ios.yml`.
+- [x] **Phase 7: Hybrid Consensus AI (Cloud Gemini + Local LAN Ollama Agent)** (COMPLETED & VERIFIED)
+  - Backend: Created `POST /meals/synthesize` (and `/nutrilens/meals/synthesize`) with structured Gemini consensus arbitration and deterministic fallback in `routes_meals.py` and `analysis.py`.
+  - Mobile: Built `LocalAiService` connecting to local Ollama server at `http://192.168.0.200:11434` with LAN ping check, model listing, and multimodal vision evaluation.
+  - Mobile: Implemented `ConsensusNotifier` / `consensusProvider` managing async state, elapsed timer, and synthesis re-sync.
+  - Mobile: Created `ConsensusCard` in `ResultsScreen` for side-by-side comparison, oil sheen alerts, and one-tap re-sync & finalize.
+  - Mobile: Added Local AI configuration section to `SettingsScreen` with server URL input, connection testing, and model selection.
+  - iOS: Enabled local cleartext HTTP on LAN in `Info.plist` (`NSAllowsLocalNetworking: true`).
 
 ---
 
-## ARCHITECTURE PROPOSAL: Hybrid Cloud-Local AI (Ollama + Gemini Consensus)
-> **Status:** APPROVED PROPOSAL (Implementation will commence immediately after completing the core missing features above).
+## HYBRID ARCHITECTURE (Ollama + Gemini Consensus)
+> **Status:** IMPLEMENTED & VERIFIED (Phase 7).
 
 ### 1. Concept Summary
 A two-tier **Mixture-of-Agents (MoA) / Consensus Architecture**:

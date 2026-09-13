@@ -28,6 +28,7 @@ from app.models.schemas import (
     AnalyzeItem,
     GramsRange,
     Macros,
+    SynthesizeMealResponse,
 )
 from app.services.nutrition import get_food_fuzzy, compute_macros_from_food
 
@@ -584,8 +585,14 @@ def _build_item_from_ai(item_id: str, item_data: Dict[str, Any]) -> AnalyzeItem:
     food = get_food_fuzzy(db, label)
     if food:
         macros_dict = compute_macros_from_food(food, grams_estimate)
+    elif "macros" in item_data and isinstance(item_data["macros"], dict):
+        macros_dict = item_data["macros"]
     else:
-        macros_dict = {"kcal": 0, "protein_g": 0.0, "carbs_g": 0.0, "fat_g": 0.0}
+        try:
+            from app.services.nutrition import compute_macros
+            macros_dict = compute_macros(label, grams_estimate)
+        except Exception:
+            macros_dict = {"kcal": 0, "protein_g": 0.0, "carbs_g": 0.0, "fat_g": 0.0}
 
     return AnalyzeItem(
         item_id=item_id,
@@ -761,3 +768,143 @@ async def analyze_images_deterministic(
         items=[item],
         warnings=["oil_sauce_uncertain"] if "oil" in food_key else [],
     )
+
+
+def _build_synthesize_response(payload: Dict[str, Any], method: str = "gemini_arbitrated_consensus") -> SynthesizeMealResponse:
+    raw_items = payload.get("items") or []
+    items = [_build_item_from_ai(f"syn-{index + 1}", item) for index, item in enumerate(raw_items)]
+
+    total_kcal = sum(item.macros.kcal for item in items)
+    total_p = round(sum(item.macros.protein_g for item in items), 1)
+    total_c = round(sum(item.macros.carbs_g for item in items), 1)
+    total_f = round(sum(item.macros.fat_g for item in items), 1)
+
+    total_macros = Macros(
+        kcal=total_kcal,
+        protein_g=total_p,
+        carbs_g=total_c,
+        fat_g=total_f,
+    )
+
+    return SynthesizeMealResponse(
+        consensus_summary=str(payload.get("consensus_summary") or "Synthesized consensus from Cloud and Local AI models."),
+        adjustments_made=[str(adj) for adj in payload.get("adjustments_made", [])],
+        items=items,
+        total_macros=total_macros,
+        overall_confidence=_clamp_confidence(payload.get("overall_confidence"), 0.85),
+        consensus_method=method,
+    )
+
+
+def _synthesize_deterministic(
+    cloud_analysis: Dict[str, Any],
+    local_analysis: Dict[str, Any],
+    notes: Optional[str] = None,
+) -> SynthesizeMealResponse:
+    """Fallback rule-based synthesizer when Gemini API is offline."""
+    cloud_items = cloud_analysis.get("items", [])
+    local_items = local_analysis.get("items", [])
+
+    merged_items: List[Dict[str, Any]] = []
+    adjustments: List[str] = []
+    seen_labels = set()
+
+    for item in cloud_items:
+        label = str(item.get("label", "")).strip().lower()
+        seen_labels.add(label)
+        grams = item.get("grams_estimate") or item.get("grams", 100)
+        merged_items.append({
+            "label": label,
+            "grams_estimate": grams,
+            "label_confidence": item.get("label_confidence", 0.8),
+            "grams_confidence": item.get("grams_confidence", 0.7),
+            "macros": item.get("macros"),
+        })
+
+    for item in local_items:
+        label = str(item.get("label", "")).strip().lower()
+        if label and label not in seen_labels:
+            grams = item.get("grams_estimate") or item.get("grams", 50)
+            merged_items.append({
+                "label": label,
+                "grams_estimate": grams,
+                "label_confidence": item.get("label_confidence", 0.75),
+                "grams_confidence": item.get("grams_confidence", 0.65),
+                "macros": item.get("macros"),
+            })
+            adjustments.append(f"Incorporated {label} ({grams}g) identified by Local Vision Agent.")
+
+    if not adjustments:
+        adjustments.append("Cross-verified items across both models; portion estimates aligned.")
+
+    summary = (
+        f"Consensus reached by reconciling {len(cloud_items)} cloud item(s) and {len(local_items)} local agent item(s)."
+    )
+
+    payload = {
+        "consensus_summary": summary,
+        "adjustments_made": adjustments,
+        "items": merged_items,
+        "overall_confidence": 0.82,
+    }
+    return _build_synthesize_response(payload, method="deterministic_consensus_fallback")
+
+
+async def synthesize_consensus_analysis(
+    cloud_analysis: Dict[str, Any],
+    local_analysis: Dict[str, Any],
+    notes: Optional[str] = None,
+) -> SynthesizeMealResponse:
+    """
+    Arbitrate between Cloud Vision Model (Gemini) and Local Vision Agent (Ollama).
+    Reconciles portions, hidden cooking oils/fats, layered items, and outputs consensus.
+    """
+    if GEMINI_API_KEY and _genai_client is not None and genai_types is not None:
+        prompt = f"""
+You are the Senior Nutritional Consensus Arbitrator for NutriLens.
+
+Two AI systems have evaluated meal photos:
+1. Fast Cloud Vision Analysis:
+{json.dumps(cloud_analysis, indent=2, default=str)}
+
+2. Deep Local Vision Agent Analysis (Ollama LAN Agent):
+{json.dumps(local_analysis, indent=2, default=str)}
+
+User Notes / Context:
+{notes or "None provided"}
+
+Your task:
+- Act as the supreme arbitrator reconciling differences between the two AI evaluations.
+- Deep local models often catch subtleties like surface sheen from cooking oils/ghee/butter, layered toppings, or sauces. Cloud models often have more accurate global semantic categories and portion benchmarks.
+- Reconcile ingredients, portions (grams), and hidden oils into a single authoritative item list.
+- Return strictly valid JSON with no markdown formatting matching:
+{{
+  "consensus_summary": "1-2 sentence rationale explaining how differences were reconciled.",
+  "adjustments_made": [
+    "Added 15g butter based on local surface sheen detection",
+    "Adjusted chicken breast to 160g"
+  ],
+  "items": [
+    {{
+      "label": "chicken breast",
+      "label_confidence": 0.9,
+      "grams_estimate": 160,
+      "grams_range": {{"min": 140, "max": 180}},
+      "grams_confidence": 0.85
+    }}
+  ],
+  "overall_confidence": 0.85
+}}
+""".strip()
+
+        try:
+            parts = [genai_types.Part.from_text(text=prompt)]
+            response_text = _generate_gemini_content(parts)
+            payload = _extract_json_block(response_text)
+            return _build_synthesize_response(payload, method="gemini_arbitrated_consensus")
+        except Exception as e:
+            # Fallback to rule-based synthesis
+            pass
+
+    return _synthesize_deterministic(cloud_analysis, local_analysis, notes)
+

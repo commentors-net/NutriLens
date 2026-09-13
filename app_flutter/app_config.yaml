@@ -13,9 +13,9 @@ bundle_id_base: com.foodvision.app
 package_name: com.foodvision.app
 
 # Version Info (Semantic Versioning: MAJOR.MINOR.PATCH+BUILD)
-# Update these in pubspec.yaml version field as: 0.1.0+1
-# version_name: 0.1.0    (from pubspec.yaml)
-# version_code: 1        (from pubspec.yaml, after +)
+# Update these in pubspec.yaml version field as: 0.1.1+2
+# version_name: 0.1.1    (from pubspec.yaml)
+# version_code: 2        (from pubspec.yaml, after +)
 
 # Platform Minimums
 android:

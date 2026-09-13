@@ -4,6 +4,7 @@ This log tracks all version increments across Android and iOS builds.
 
 | Version | Version Name | Build Code | Date (Local) | Notes / Trigger | Previous Version |
 | :--- | :--- | :--- | :--- | :--- | :--- |
+| 0.1.1+2 | 0.1.1 | 2 | 2026-09-13 13:16:07 | Hybrid Consensus AI (Gemini + Local Ollama), ATS LAN config, CI artifact workflow fix | `0.1.0+1` |
 | 0.1.0+1 | 0.1.0 | 1 | 2026-09-13 | Initial mobile release baseline for Android and iOS | Initial Baseline |
 
 ---

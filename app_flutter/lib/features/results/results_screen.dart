@@ -5,6 +5,7 @@ import 'package:foodvision/app/router.dart';
 import 'package:foodvision/core/models/analyze_response.dart';
 import 'package:foodvision/features/capture/capture_controller.dart';
 import 'package:foodvision/features/results/analysis_provider.dart';
+import 'package:foodvision/features/results/consensus_card.dart';
 
 class ResultsScreen extends ConsumerWidget {
   const ResultsScreen({super.key});
@@ -185,6 +186,10 @@ class _ResultsView extends ConsumerWidget {
           ),
           const SizedBox(height: 16),
         ],
+
+        // Hybrid Consensus: Deep Local AI Second Opinion
+        ConsensusCard(cloudAnalysis: response),
+        const SizedBox(height: 16),
 
         // Save Meal button — watches save state
         _SaveMealButton(response: response),
