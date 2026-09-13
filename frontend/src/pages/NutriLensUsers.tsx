@@ -76,18 +76,55 @@ export default function NutriLensUsers() {
       return;
     }
 
+    // If nutrilens is turned off, deep_local_ai is automatically disabled
+    const updatedDeepAi = updated.includes("nutrilens") ? (user.deep_local_ai || false) : false;
+
     setSavingUser(user.username);
     try {
       const saved = await authApi.updateUserAccess(
         user.username,
-        { allowed_systems: updated },
+        {
+          allowed_systems: updated,
+          deep_local_ai: updatedDeepAi,
+        },
         "nutrilens",
       );
       setUsers((prev) =>
-        prev.map((u) => (u.username === user.username ? { ...saved, is_admin: u.is_admin } : u)),
+        prev.map((u) =>
+          u.username === user.username
+            ? { ...saved, is_admin: u.is_admin, deep_local_ai: saved.deep_local_ai ?? updatedDeepAi }
+            : u
+        ),
       );
     } catch (err: any) {
       const message = err?.response?.data?.detail || "Failed to update user access";
+      alert(message);
+    } finally {
+      setSavingUser("");
+    }
+  };
+
+  const toggleDeepLocalAi = async (user: UserDetail) => {
+    const newStatus = !user.deep_local_ai;
+    setSavingUser(user.username);
+    try {
+      const saved = await authApi.updateUserAccess(
+        user.username,
+        {
+          allowed_systems: user.allowed_systems,
+          deep_local_ai: newStatus,
+        },
+        "nutrilens",
+      );
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.username === user.username
+            ? { ...u, deep_local_ai: saved.deep_local_ai ?? newStatus }
+            : u
+        ),
+      );
+    } catch (err: any) {
+      const message = err?.response?.data?.detail || "Failed to update Deep Local AI access";
       alert(message);
     } finally {
       setSavingUser("");
@@ -160,7 +197,7 @@ export default function NutriLensUsers() {
                         </Typography>
                       )}
                     </Box>
-                    <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ minWidth: { sm: "300px" } }}>
+                    <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ minWidth: { sm: "420px" } }} alignItems={{ sm: "center" }}>
                       <FormControlLabel
                         control={
                           <Checkbox
@@ -173,18 +210,47 @@ export default function NutriLensUsers() {
                         label="Leave Tracker"
                         sx={{ mb: 0 }}
                       />
-                      <FormControlLabel
-                        control={
-                          <Checkbox
-                            checked={user.allowed_systems.includes("nutrilens")}
-                            onChange={() => toggleSystem(user, "nutrilens")}
-                            disabled={savingUser === user.username}
-                            size="small"
-                          />
-                        }
-                        label="NutriLens"
-                        sx={{ mb: 0 }}
-                      />
+                      <Box sx={{ display: "flex", flexDirection: "column" }}>
+                        <FormControlLabel
+                          control={
+                            <Checkbox
+                              checked={user.allowed_systems.includes("nutrilens")}
+                              onChange={() => toggleSystem(user, "nutrilens")}
+                              disabled={savingUser === user.username}
+                              size="small"
+                            />
+                          }
+                          label="NutriLens"
+                          sx={{ mb: 0 }}
+                        />
+                        {user.allowed_systems.includes("nutrilens") && (
+                          <Box sx={{ pl: 2, pt: 0.5 }}>
+                            <FormControlLabel
+                              control={
+                                <Checkbox
+                                  checked={user.deep_local_ai || false}
+                                  onChange={() => toggleDeepLocalAi(user)}
+                                  disabled={savingUser === user.username}
+                                  size="small"
+                                  color="secondary"
+                                />
+                              }
+                              label={
+                                <Typography
+                                  variant="caption"
+                                  sx={{
+                                    fontWeight: 600,
+                                    color: user.deep_local_ai ? "secondary.main" : "text.secondary",
+                                  }}
+                                >
+                                  ⚡ Deep Local AI Evaluation
+                                </Typography>
+                              }
+                              sx={{ mb: 0 }}
+                            />
+                          </Box>
+                        )}
+                      </Box>
                       <FormControlLabel
                         control={
                           <Checkbox

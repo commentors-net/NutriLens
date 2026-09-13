@@ -19,12 +19,13 @@ from ..core.security import (
 router = APIRouter()
 
 
-def _build_login_response(username: str, allowed_systems: list[str]) -> dict:
+def _build_login_response(username: str, allowed_systems: list[str], deep_local_ai: bool = False) -> dict:
     systems = allowed_systems or ["leave-tracker"]
     return {
         "allowed_systems": systems,
         "default_system": systems[0],
         "username": username,
+        "deep_local_ai": deep_local_ai,
     }
 
 
@@ -111,7 +112,8 @@ def login(data: schemas.TokenData):
     )
 
     allowed_systems = db.get_user_system_access(user["id"])
-    login_payload = _build_login_response(user["username"], allowed_systems)
+    deep_ai = db.get_user_deep_local_ai_access(user["id"]) if hasattr(db, "get_user_deep_local_ai_access") else False
+    login_payload = _build_login_response(user["username"], allowed_systems, deep_ai)
     
     return {
         "access_token": access_token,
@@ -148,11 +150,12 @@ def google_login(data: schemas.GoogleLoginRequest):
         db.set_user_system_access(user["id"], ["leave-tracker", "nutrilens"])
 
     allowed_systems = db.get_user_system_access(user["id"])
+    deep_ai = db.get_user_deep_local_ai_access(user["id"]) if hasattr(db, "get_user_deep_local_ai_access") else False
     access_token = create_access_token(
         data={"sub": user["username"]},
         expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
     )
-    login_payload = _build_login_response(user["username"], allowed_systems)
+    login_payload = _build_login_response(user["username"], allowed_systems, deep_ai)
 
     return {
         "access_token": access_token,
@@ -168,7 +171,8 @@ def get_me(current_user: str = Depends(get_current_user)):
         raise HTTPException(status_code=404, detail="User not found")
 
     allowed_systems = db.get_user_system_access(user["id"])
-    return _build_login_response(user["username"], allowed_systems)
+    deep_ai = db.get_user_deep_local_ai_access(user["id"]) if hasattr(db, "get_user_deep_local_ai_access") else False
+    return _build_login_response(user["username"], allowed_systems, deep_ai)
 
 
 @router.get("/user-access", response_model=list[schemas.UserAccessItem])
@@ -179,11 +183,13 @@ def list_user_access(current_user: str = Depends(get_current_user)):
     result: list[schemas.UserAccessItem] = []
     for user in users:
         systems = db.get_user_system_access(user["id"])
+        deep_ai = db.get_user_deep_local_ai_access(user["id"]) if hasattr(db, "get_user_deep_local_ai_access") else False
         result.append(
             schemas.UserAccessItem(
                 user_id=user["id"],
                 username=user["username"],
                 allowed_systems=systems,
+                deep_local_ai=deep_ai,
             )
         )
 
@@ -202,12 +208,14 @@ def update_user_access(
         raise HTTPException(status_code=404, detail="User not found")
 
     systems = _normalize_allowed_systems(payload.allowed_systems)
-    db.set_user_system_access(user["id"], systems)
+    db.set_user_system_access(user["id"], systems, deep_local_ai=payload.deep_local_ai)
+    deep_ai = db.get_user_deep_local_ai_access(user["id"]) if hasattr(db, "get_user_deep_local_ai_access") else False
 
     return schemas.UserAccessItem(
         user_id=user["id"],
         username=user["username"],
         allowed_systems=systems,
+        deep_local_ai=deep_ai,
     )
 
 
@@ -226,12 +234,14 @@ def get_user_detail(
     
     systems = db.get_user_system_access(user["id"])
     is_admin = bool(user.get("is_admin", 0))
+    deep_ai = db.get_user_deep_local_ai_access(user["id"]) if hasattr(db, "get_user_deep_local_ai_access") else False
     
     return schemas.UserDetailResponse(
         user_id=user["id"],
         username=user["username"],
         allowed_systems=systems,
         is_admin=is_admin,
+        deep_local_ai=deep_ai,
     )
 
 
@@ -258,13 +268,64 @@ def update_user_admin_status(
     db.update_user_admin_status(user["id"], payload.is_admin)
     updated_user = db.get_user_by_username(username)
     systems = db.get_user_system_access(user["id"])
+    deep_ai = db.get_user_deep_local_ai_access(user["id"]) if hasattr(db, "get_user_deep_local_ai_access") else False
     
     return schemas.UserDetailResponse(
         user_id=updated_user["id"],
         username=updated_user["username"],
         allowed_systems=systems,
         is_admin=bool(payload.is_admin),
+        deep_local_ai=deep_ai,
     )
+
+
+@router.get("/system-settings", response_model=schemas.NutriLensSystemSettings)
+def get_system_settings(current_user: str = Depends(get_current_user)):
+    """Get NutriLens system-wide configuration settings."""
+    if hasattr(db, "get_system_settings"):
+        raw = db.get_system_settings()
+        return schemas.NutriLensSystemSettings(
+            local_ai_url=raw.get("local_ai_url", "http://192.168.0.200:11434"),
+            local_ai_model=raw.get("local_ai_model", "llama3.2-vision"),
+            local_ai_timeout_seconds=int(raw.get("local_ai_timeout_seconds", 90)),
+            gemini_model=raw.get("gemini_model", "gemini-2.5-flash"),
+            gemini_timeout_seconds=int(raw.get("gemini_timeout_seconds", 15)),
+            default_locale=raw.get("default_locale", "en_MY"),
+            default_currency=raw.get("default_currency", "MYR"),
+            unit_system=raw.get("unit_system", "metric"),
+            default_calorie_goal=int(raw.get("default_calorie_goal", 2000)),
+            default_protein_goal_g=float(raw.get("default_protein_goal_g", 100.0)),
+            default_carbs_goal_g=float(raw.get("default_carbs_goal_g", 250.0)),
+            default_fat_goal_g=float(raw.get("default_fat_goal_g", 65.0)),
+        )
+    return schemas.NutriLensSystemSettings()
+
+
+@router.put("/system-settings", response_model=schemas.NutriLensSystemSettings)
+def update_system_settings(
+    settings: schemas.NutriLensSystemSettingsUpdate,
+    current_user: str = Depends(get_current_user),
+):
+    """Update NutriLens system-wide configuration settings. Admin only."""
+    _require_access_admin(current_user)
+    update_dict = {k: v for k, v in settings.dict().items() if v is not None}
+    if hasattr(db, "update_system_settings"):
+        raw = db.update_system_settings(update_dict)
+        return schemas.NutriLensSystemSettings(
+            local_ai_url=raw.get("local_ai_url", "http://192.168.0.200:11434"),
+            local_ai_model=raw.get("local_ai_model", "llama3.2-vision"),
+            local_ai_timeout_seconds=int(raw.get("local_ai_timeout_seconds", 90)),
+            gemini_model=raw.get("gemini_model", "gemini-2.5-flash"),
+            gemini_timeout_seconds=int(raw.get("gemini_timeout_seconds", 15)),
+            default_locale=raw.get("default_locale", "en_MY"),
+            default_currency=raw.get("default_currency", "MYR"),
+            unit_system=raw.get("unit_system", "metric"),
+            default_calorie_goal=int(raw.get("default_calorie_goal", 2000)),
+            default_protein_goal_g=float(raw.get("default_protein_goal_g", 100.0)),
+            default_carbs_goal_g=float(raw.get("default_carbs_goal_g", 250.0)),
+            default_fat_goal_g=float(raw.get("default_fat_goal_g", 65.0)),
+        )
+    return schemas.NutriLensSystemSettings()
 
 @router.post("/change-password")
 def change_user_password(data: schemas.PasswordChange):

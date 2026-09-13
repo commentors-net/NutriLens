@@ -62,8 +62,16 @@ class LocalAiItem {
 }
 
 class LocalAiService {
-  static const String kDefaultUrl = 'http://192.168.0.200:11434';
-  static const String kDefaultModel = 'llama3.2-vision';
+  /// Default endpoint can be configured at launch or build time via:
+  /// flutter run --dart-define=LOCAL_AI_URL=http://<host>:11434
+  static const String kDefaultUrl = String.fromEnvironment(
+    'LOCAL_AI_URL',
+    defaultValue: 'http://192.168.0.200:11434',
+  );
+  static const String kDefaultModel = String.fromEnvironment(
+    'LOCAL_AI_MODEL',
+    defaultValue: 'llama3.2-vision',
+  );
 
   static const String _prefEnabledKey = 'local_ai_enabled';
   static const String _prefUrlKey = 'local_ai_url';
@@ -81,7 +89,11 @@ class LocalAiService {
 
   Future<String> getBaseUrl() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_prefUrlKey) ?? kDefaultUrl;
+    final saved = prefs.getString(_prefUrlKey);
+    if (saved != null && saved.trim().isNotEmpty) {
+      return saved.trim().replaceAll(RegExp(r'/+$'), '');
+    }
+    return kDefaultUrl.replaceAll(RegExp(r'/+$'), '');
   }
 
   Future<void> setBaseUrl(String url) async {
@@ -91,7 +103,11 @@ class LocalAiService {
 
   Future<String> getSelectedModel() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_prefModelKey) ?? kDefaultModel;
+    final saved = prefs.getString(_prefModelKey);
+    if (saved != null && saved.trim().isNotEmpty) {
+      return saved.trim();
+    }
+    return kDefaultModel;
   }
 
   Future<void> setSelectedModel(String model) async {
@@ -102,7 +118,8 @@ class LocalAiService {
   /// Ping local Ollama server to verify reachability on LAN
   Future<bool> checkReachability({String? urlOverride}) async {
     try {
-      final base = urlOverride ?? await getBaseUrl();
+      final base = (urlOverride ?? await getBaseUrl()).trim().replaceAll(RegExp(r'/+$'), '');
+      if (base.isEmpty) return false;
       final url = Uri.parse('$base/api/tags');
       final response = await http.get(url).timeout(const Duration(seconds: 3));
       return response.statusCode == 200;
@@ -114,7 +131,8 @@ class LocalAiService {
   /// Query available local vision models from Ollama
   Future<List<String>> fetchModels({String? urlOverride}) async {
     try {
-      final base = urlOverride ?? await getBaseUrl();
+      final base = (urlOverride ?? await getBaseUrl()).trim().replaceAll(RegExp(r'/+$'), '');
+      if (base.isEmpty) return [];
       final url = Uri.parse('$base/api/tags');
       final response = await http.get(url).timeout(const Duration(seconds: 4));
       if (response.statusCode == 200) {
@@ -134,7 +152,7 @@ class LocalAiService {
     String? modelOverride,
     String? userNote,
   }) async {
-    final base = await getBaseUrl();
+    final base = (await getBaseUrl()).trim().replaceAll(RegExp(r'/+$'), '');
     final model = modelOverride ?? await getSelectedModel();
 
     // Encode images to base64

@@ -35,6 +35,7 @@ import NutriLensHistory from '@pages/NutriLensHistory';
 import NutriLensProfile from '@pages/NutriLensProfile';
 import NutriLensDashboard from '@pages/NutriLensDashboard';
 import NutriLensAppLogs from '@pages/NutriLensAppLogs';
+import NutriLensSettings from '@pages/NutriLensSettings';
 import config from '@/config';
 
 function AppContent() {
@@ -113,6 +114,7 @@ function AppContent() {
           { label: 'Profile', path: '/nutrilens/profile' },
           { label: 'Users', path: '/nutrilens/users' },
           { label: 'App Logs', path: '/nutrilens/logs' },
+          { label: 'Settings', path: '/nutrilens/settings' },
         ]
       : selectedSystem === 'leave-tracker'
       ? [
@@ -175,6 +177,9 @@ function AppContent() {
                   </Button>
                   <Button color="inherit" component={Link} to="/nutrilens/logs" size="small">
                     App Logs
+                  </Button>
+                  <Button color="inherit" component={Link} to="/nutrilens/settings" size="small">
+                    Settings
                   </Button>
                 </>
               ) : selectedSystem === 'leave-tracker' && canUseLeaveTracker ? (
@@ -294,6 +299,10 @@ function AppContent() {
           <Route
             path="/nutrilens/logs"
             element={isLoggedIn && selectedSystem === 'nutrilens' && canUseNutriLens ? <NutriLensAppLogs /> : <Navigate to="/app-select" replace />}
+          />
+          <Route
+            path="/nutrilens/settings"
+            element={isLoggedIn && selectedSystem === 'nutrilens' && canUseNutriLens ? <NutriLensSettings /> : <Navigate to="/app-select" replace />}
           />
           <Route
             path="/nutrilens/meals"

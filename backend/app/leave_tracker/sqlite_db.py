@@ -56,7 +56,26 @@ class SQLiteDB:
                 user_id TEXT PRIMARY KEY,
                 leave_tracker_access INTEGER NOT NULL DEFAULT 1,
                 nutrilens_access INTEGER NOT NULL DEFAULT 1,
+                deep_local_ai_access INTEGER NOT NULL DEFAULT 0,
                 FOREIGN KEY (user_id) REFERENCES users (id)
+            )
+        ''')
+
+        # Migration: add deep_local_ai_access to user_apps if not present
+        try:
+            cursor.execute(
+                "ALTER TABLE user_apps ADD COLUMN deep_local_ai_access INTEGER NOT NULL DEFAULT 0"
+            )
+            conn.commit()
+        except Exception:
+            pass  # Column already exists
+
+        # NutriLens system settings table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS nutrilens_system_settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL,
+                updated_at TEXT
             )
         ''')
 
@@ -218,28 +237,46 @@ class SQLiteDB:
         # Return updated user
         return self.get_user_by_id(user_id)
 
-    def set_user_system_access(self, user_id: str, systems: List[str]) -> Dict[str, Any]:
-        """Upsert allowed systems for a user."""
+    def set_user_system_access(
+        self,
+        user_id: str,
+        systems: List[str],
+        deep_local_ai: Optional[bool] = None,
+    ) -> Dict[str, Any]:
+        """Upsert allowed systems and deep local AI access for a user."""
         allow_leave_tracker = 1 if "leave-tracker" in systems else 0
         allow_nutrilens = 1 if "nutrilens" in systems else 0
 
         conn = self._get_connection()
         cursor = conn.cursor()
+
+        if deep_local_ai is None:
+            cursor.execute("SELECT deep_local_ai_access FROM user_apps WHERE user_id = ?", (user_id,))
+            row = cursor.fetchone()
+            allow_deep_local_ai = row["deep_local_ai_access"] if (row and "deep_local_ai_access" in row.keys()) else 0
+        else:
+            allow_deep_local_ai = 1 if (deep_local_ai and allow_nutrilens) else 0
+
+        if not allow_nutrilens:
+            allow_deep_local_ai = 0
+
         cursor.execute(
             '''
-            INSERT INTO user_apps (user_id, leave_tracker_access, nutrilens_access)
-            VALUES (?, ?, ?)
+            INSERT INTO user_apps (user_id, leave_tracker_access, nutrilens_access, deep_local_ai_access)
+            VALUES (?, ?, ?, ?)
             ON CONFLICT(user_id) DO UPDATE SET
                 leave_tracker_access = excluded.leave_tracker_access,
-                nutrilens_access = excluded.nutrilens_access
+                nutrilens_access = excluded.nutrilens_access,
+                deep_local_ai_access = excluded.deep_local_ai_access
             ''',
-            (user_id, allow_leave_tracker, allow_nutrilens),
+            (user_id, allow_leave_tracker, allow_nutrilens, allow_deep_local_ai),
         )
         conn.commit()
         conn.close()
 
         return {
             "systems": self.get_user_system_access(user_id),
+            "deep_local_ai": bool(allow_deep_local_ai),
         }
 
     def get_user_system_access(self, user_id: str) -> List[str]:
@@ -265,6 +302,65 @@ class SQLiteDB:
         default_systems = ["leave-tracker", "nutrilens"]
         self.set_user_system_access(user_id, default_systems)
         return default_systems
+
+    def get_user_deep_local_ai_access(self, user_id: str) -> bool:
+        """Get whether user has access to deep local AI evaluation."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT nutrilens_access, deep_local_ai_access FROM user_apps WHERE user_id = ?",
+            (user_id,),
+        )
+        row = cursor.fetchone()
+        conn.close()
+        if row and "deep_local_ai_access" in row.keys():
+            return bool(row["nutrilens_access"] and row["deep_local_ai_access"])
+        return False
+
+    def get_system_settings(self) -> Dict[str, Any]:
+        """Get all NutriLens system settings."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT key, value FROM nutrilens_system_settings")
+        rows = cursor.fetchall()
+        conn.close()
+        defaults = {
+            "local_ai_url": "http://192.168.0.200:11434",
+            "local_ai_model": "llama3.2-vision",
+            "local_ai_timeout_seconds": "90",
+            "gemini_model": "gemini-2.5-flash",
+            "gemini_timeout_seconds": "15",
+            "default_locale": "en_MY",
+            "default_currency": "MYR",
+            "unit_system": "metric",
+            "default_calorie_goal": "2000",
+            "default_protein_goal_g": "100.0",
+            "default_carbs_goal_g": "250.0",
+            "default_fat_goal_g": "65.0",
+        }
+        for row in rows:
+            defaults[row["key"]] = row["value"]
+        return defaults
+
+    def update_system_settings(self, settings: Dict[str, Any]) -> Dict[str, Any]:
+        """Update NutriLens system settings."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        now = datetime.now().isoformat()
+        for k, v in settings.items():
+            cursor.execute(
+                '''
+                INSERT INTO nutrilens_system_settings (key, value, updated_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(key) DO UPDATE SET
+                    value = excluded.value,
+                    updated_at = excluded.updated_at
+                ''',
+                (k, str(v), now),
+            )
+        conn.commit()
+        conn.close()
+        return self.get_system_settings()
 
     # ==================== NUTRILENS PROFILE ====================
 

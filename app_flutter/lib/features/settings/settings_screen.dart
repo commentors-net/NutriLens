@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:foodvision/core/config/environment.dart';
 import 'package:foodvision/core/auth/auth_service.dart';
 import 'package:foodvision/core/services/app_log_service.dart';
@@ -32,6 +33,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool? _localAiReachable;
   List<String> _availableLocalModels = [];
 
+  // Regional & Authorization state
+  bool _deepLocalAiAllowed = false;
+  bool _checkingDeepLocalAi = true;
+  String _selectedLocale = 'en_MY';
+  String _selectedCurrency = 'MYR';
+  String _selectedUnitSystem = 'metric';
+
   @override
   void initState() {
     super.initState();
@@ -39,6 +47,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _localAiModelController = TextEditingController(text: LocalAiService.kDefaultModel);
     _loadConsent();
     _loadLocalAiSettings();
+    _checkDeepLocalAiPermission();
+    _loadRegionalPreferences();
   }
 
   @override
@@ -46,6 +56,46 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _localAiUrlController.dispose();
     _localAiModelController.dispose();
     super.dispose();
+  }
+
+  Future<void> _checkDeepLocalAiPermission() async {
+    final auth = ref.read(authServiceProvider);
+    final allowed = await auth.canAccessDeepLocalAi();
+    if (!mounted) return;
+    setState(() {
+      _deepLocalAiAllowed = allowed;
+      _checkingDeepLocalAi = false;
+    });
+  }
+
+  Future<void> _loadRegionalPreferences() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      _selectedLocale = prefs.getString('user_locale') ?? 'en_MY';
+      _selectedCurrency = prefs.getString('user_currency') ?? 'MYR';
+      _selectedUnitSystem = prefs.getString('user_unit_system') ?? 'metric';
+    });
+  }
+
+  Future<void> _saveRegionalPreferences({
+    String? locale,
+    String? currency,
+    String? unitSystem,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (locale != null) {
+      await prefs.setString('user_locale', locale);
+      setState(() => _selectedLocale = locale);
+    }
+    if (currency != null) {
+      await prefs.setString('user_currency', currency);
+      setState(() => _selectedCurrency = currency);
+    }
+    if (unitSystem != null) {
+      await prefs.setString('user_unit_system', unitSystem);
+      setState(() => _selectedUnitSystem = unitSystem);
+    }
   }
 
   Future<void> _loadLocalAiSettings() async {
@@ -273,6 +323,108 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ),
             const SizedBox(height: 16),
+            // Preferences & Localization Section
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        CircleAvatar(
+                          backgroundColor: Colors.teal,
+                          foregroundColor: Colors.white,
+                          child: Icon(Icons.language),
+                        ),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Preferences & Localization',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Text(
+                                'Display language, currency, and measurement units',
+                                style: TextStyle(fontSize: 12, color: Colors.grey),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<String>(
+                      initialValue: _selectedLocale,
+                      decoration: const InputDecoration(
+                        labelText: 'App Language & Locale',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.translate),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'en_MY', child: Text('English (Malaysia - en_MY)')),
+                        DropdownMenuItem(value: 'ms_MY', child: Text('Bahasa Melayu (ms_MY)')),
+                        DropdownMenuItem(value: 'en_SG', child: Text('English (Singapore - en_SG)')),
+                        DropdownMenuItem(value: 'en_US', child: Text('English (US - en_US)')),
+                        DropdownMenuItem(value: 'en_GB', child: Text('English (UK - en_GB)')),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) _saveRegionalPreferences(locale: val);
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            initialValue: _selectedCurrency,
+                            decoration: const InputDecoration(
+                              labelText: 'Currency',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.attach_money),
+                            ),
+                            items: const [
+                              DropdownMenuItem(value: 'MYR', child: Text('MYR (RM)')),
+                              DropdownMenuItem(value: 'SGD', child: Text('SGD (S\$)')),
+                              DropdownMenuItem(value: 'USD', child: Text('USD (\$)')),
+                              DropdownMenuItem(value: 'EUR', child: Text('EUR (€)')),
+                              DropdownMenuItem(value: 'GBP', child: Text('GBP (£)')),
+                            ],
+                            onChanged: (val) {
+                              if (val != null) _saveRegionalPreferences(currency: val);
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            initialValue: _selectedUnitSystem,
+                            decoration: const InputDecoration(
+                              labelText: 'Unit System',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.straighten),
+                            ),
+                            items: const [
+                              DropdownMenuItem(value: 'metric', child: Text('Metric (g, ml)')),
+                              DropdownMenuItem(value: 'imperial', child: Text('Imperial (oz, fl oz)')),
+                            ],
+                            onChanged: (val) {
+                              if (val != null) _saveRegionalPreferences(unitSystem: val);
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
             // Local AI (Ollama) Section
             Card(
               child: Padding(
@@ -282,17 +434,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   children: [
                     Row(
                       children: [
-                        const CircleAvatar(
-                          backgroundColor: Colors.indigo,
+                        CircleAvatar(
+                          backgroundColor: _deepLocalAiAllowed ? Colors.indigo : Colors.grey.shade400,
                           foregroundColor: Colors.white,
-                          child: Icon(Icons.hub),
+                          child: const Icon(Icons.hub),
                         ),
                         const SizedBox(width: 12),
-                        const Expanded(
+                        Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
+                              const Text(
                                 'Local AI Agent (Ollama)',
                                 style: TextStyle(
                                   fontSize: 16,
@@ -300,28 +452,78 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                 ),
                               ),
                               Text(
-                                'Deep multimodal second opinion on your LAN',
-                                style: TextStyle(fontSize: 12, color: Colors.grey),
+                                _deepLocalAiAllowed
+                                    ? 'Deep multimodal second opinion on your LAN'
+                                    : 'Feature requires administrator permission',
+                                style: const TextStyle(fontSize: 12, color: Colors.grey),
                               ),
                             ],
                           ),
                         ),
-                        Switch(
-                          value: _localAiEnabled,
-                          onChanged: (val) async {
-                            setState(() => _localAiEnabled = val);
-                            await ref.read(localAiServiceProvider).setEnabled(val);
-                          },
-                        ),
+                        if (_checkingDeepLocalAi)
+                          const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        else if (!_deepLocalAiAllowed)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade200,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Text(
+                              'Restricted',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black54,
+                              ),
+                            ),
+                          )
+                        else
+                          Switch(
+                            value: _localAiEnabled,
+                            onChanged: (val) async {
+                              setState(() => _localAiEnabled = val);
+                              await ref.read(localAiServiceProvider).setEnabled(val);
+                            },
+                          ),
                       ],
                     ),
-                    if (_localAiEnabled) ...[
+                    if (!_checkingDeepLocalAi && !_deepLocalAiAllowed) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.amber.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.amber.shade200),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(Icons.lock_outline, size: 18, color: Colors.amber.shade900),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Deep Local AI Evaluation is currently disabled for your account. NutriLens is operating strictly with cloud vision (Gemini). An administrator can grant you access in Web User Management.',
+                                style: TextStyle(fontSize: 12, color: Colors.amber.shade900),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    if (_deepLocalAiAllowed && _localAiEnabled) ...[
                       const SizedBox(height: 16),
                       TextField(
                         controller: _localAiUrlController,
                         decoration: const InputDecoration(
-                          labelText: 'Ollama LAN Endpoint',
-                          hintText: 'http://192.168.0.200:11434',
+                          labelText: 'Ollama Host Endpoint',
+                          hintText: 'http://<host-ip>:11434',
+                          helperText: 'Set any LAN IP or hostname (e.g. http://192.168.0.200:11434)',
                           border: OutlineInputBorder(),
                           prefixIcon: Icon(Icons.lan),
                         ),

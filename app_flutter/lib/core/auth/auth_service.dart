@@ -233,6 +233,32 @@ class AuthService {
     }
   }
 
+  /// Verify user has access to Deep Local AI feature under NutriLens
+  Future<bool> canAccessDeepLocalAi() async {
+    try {
+      final user = currentUser;
+      if (user == null) return false;
+
+      final idToken = await user.getIdToken();
+      final response = await _dio.get(
+        '$baseUrl/auth/me',
+        options: Options(headers: {'Authorization': 'Bearer $idToken'}),
+      );
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = response.data;
+        final allowedSystems = data['allowed_systems'] as List?;
+        final hasNutriLens = allowedSystems?.contains('nutrilens') ?? false;
+        final deepLocalAi = data['deep_local_ai'] == true;
+        return hasNutriLens && deepLocalAi;
+      }
+      return false;
+    } catch (e) {
+      print('Error checking Deep Local AI access: $e');
+      return false;
+    }
+  }
+
   /// Handle Firebase Auth exceptions
   String _handleAuthException(FirebaseAuthException e) {
     switch (e.code) {
@@ -276,4 +302,9 @@ final authStateProvider = StreamProvider<User?>((ref) {
 final currentUserProvider = Provider((ref) {
   final authService = ref.watch(authServiceProvider);
   return authService.currentUser;
+});
+
+final deepLocalAiAccessProvider = FutureProvider<bool>((ref) async {
+  final authService = ref.watch(authServiceProvider);
+  return authService.canAccessDeepLocalAi();
 });

@@ -25,6 +25,7 @@ class LoginResponse(Token):
     username: str
     allowed_systems: list[str]
     default_system: str
+    deep_local_ai: bool = False
 
 class TokenData(BaseModel):
     username: str
@@ -46,16 +47,19 @@ class UserSystemsResponse(BaseModel):
     username: str
     allowed_systems: list[str]
     default_system: str
+    deep_local_ai: bool = False
 
 
 class UserAccessItem(BaseModel):
     user_id: str
     username: str
     allowed_systems: list[str]
+    deep_local_ai: bool = False
 
 
 class UserAccessUpdate(BaseModel):
     allowed_systems: list[str]
+    deep_local_ai: bool | None = None
 
 
 class UserAdminUpdate(BaseModel):
@@ -67,6 +71,37 @@ class UserDetailResponse(BaseModel):
     username: str
     allowed_systems: list[str]
     is_admin: bool
+    deep_local_ai: bool = False
+
+
+class NutriLensSystemSettings(BaseModel):
+    local_ai_url: str = "http://192.168.0.200:11434"
+    local_ai_model: str = "llama3.2-vision"
+    local_ai_timeout_seconds: int = 90
+    gemini_model: str = "gemini-2.5-flash"
+    gemini_timeout_seconds: int = 15
+    default_locale: str = "en_MY"
+    default_currency: str = "MYR"
+    unit_system: str = "metric"
+    default_calorie_goal: int = 2000
+    default_protein_goal_g: float = 100.0
+    default_carbs_goal_g: float = 250.0
+    default_fat_goal_g: float = 65.0
+
+
+class NutriLensSystemSettingsUpdate(BaseModel):
+    local_ai_url: str | None = None
+    local_ai_model: str | None = None
+    local_ai_timeout_seconds: int | None = None
+    gemini_model: str | None = None
+    gemini_timeout_seconds: int | None = None
+    default_locale: str | None = None
+    default_currency: str | None = None
+    unit_system: str | None = None
+    default_calorie_goal: int | None = None
+    default_protein_goal_g: float | None = None
+    default_carbs_goal_g: float | None = None
+    default_fat_goal_g: float | None = None
 
 class NutriLensProfile(BaseModel):
     """User profile for NutriLens system (dietary goals and preferences)."""

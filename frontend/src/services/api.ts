@@ -69,6 +69,7 @@ export interface LoginResponse {
   username: string;
   allowed_systems: string[];
   default_system: string;
+  deep_local_ai?: boolean;
 }
 
 export interface GoogleLoginRequest {
@@ -79,16 +80,19 @@ export interface UserSystemsResponse {
   username: string;
   allowed_systems: string[];
   default_system: string;
+  deep_local_ai?: boolean;
 }
 
 export interface UserAccessItem {
   user_id: string;
   username: string;
   allowed_systems: string[];
+  deep_local_ai?: boolean;
 }
 
 export interface UserAccessUpdate {
   allowed_systems: string[];
+  deep_local_ai?: boolean;
 }
 
 export interface UserAdminUpdate {
@@ -100,6 +104,22 @@ export interface UserDetailResponse {
   username: string;
   allowed_systems: string[];
   is_admin: boolean;
+  deep_local_ai?: boolean;
+}
+
+export interface NutriLensSystemSettings {
+  local_ai_url: string;
+  local_ai_model: string;
+  local_ai_timeout_seconds: number;
+  gemini_model: string;
+  gemini_timeout_seconds: number;
+  default_locale: string;
+  default_currency: string;
+  unit_system: string;
+  default_calorie_goal: number;
+  default_protein_goal_g: number;
+  default_carbs_goal_g: number;
+  default_fat_goal_g: number;
 }
 
 type AuthSystem = "" | "leave-tracker" | "nutrilens";
@@ -191,6 +211,19 @@ export const authApi = {
     system: AuthSystem = "",
   ): Promise<any> => {
     const response = await apiClient.patch(`${authBasePath(system)}/nutrilens-profile`, data);
+    return response.data;
+  },
+
+  getSystemSettings: async (system: AuthSystem = "nutrilens"): Promise<NutriLensSystemSettings> => {
+    const response = await apiClient.get(`${authBasePath(system)}/system-settings`);
+    return response.data;
+  },
+
+  updateSystemSettings: async (
+    data: Partial<NutriLensSystemSettings>,
+    system: AuthSystem = "nutrilens",
+  ): Promise<NutriLensSystemSettings> => {
+    const response = await apiClient.put(`${authBasePath(system)}/system-settings`, data);
     return response.data;
   },
 };

@@ -4,6 +4,7 @@ import 'package:foodvision/core/models/analyze_response.dart';
 import 'package:foodvision/features/capture/capture_controller.dart';
 import 'package:foodvision/features/results/analysis_provider.dart';
 import 'package:foodvision/features/results/consensus_provider.dart';
+import 'package:foodvision/features/settings/settings_screen.dart';
 
 class ConsensusCard extends ConsumerWidget {
   final AnalyzeMealResponse cloudAnalysis;
@@ -18,6 +19,12 @@ class ConsensusCard extends ConsumerWidget {
     final consensusState = ref.watch(consensusProvider);
     final consensusNotifier = ref.read(consensusProvider.notifier);
     final captureState = ref.watch(captureProvider);
+
+    // If user does not have Deep Local AI permission, hide the consensus card entirely.
+    // The mobile experience strictly relies on Gemini cloud vision as it did prior to hybrid implementation.
+    if (!consensusState.hasPermission) {
+      return const SizedBox.shrink();
+    }
 
     // If consensus is already finalized, show the verified banner
     if (consensusState.synthesizedResponse != null) {
@@ -318,7 +325,7 @@ class ConsensusCard extends ConsumerWidget {
               ),
               const SizedBox(height: 6),
               Text(
-                'Run a detailed second-opinion evaluation via your dedicated local Ollama agent (192.168.0.200) to inspect texture, hidden cooking fats, and portion weight.',
+                'Run a detailed second-opinion evaluation via your local AI agent (${consensusState.hostDisplay}) to inspect texture, hidden cooking fats, and portion weight.',
                 style: TextStyle(fontSize: 12, color: Colors.blue.shade900),
               ),
               const SizedBox(height: 10),
@@ -358,7 +365,7 @@ class ConsensusCard extends ConsumerWidget {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              'Local AI Agent (192.168.0.200) unreachable. Connect to home Wi-Fi to enable second opinion.',
+              'Local AI Agent (${consensusState.hostDisplay}) unreachable. Verify Wi-Fi or update host in Settings.',
               style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
             ),
           ),
@@ -366,6 +373,18 @@ class ConsensusCard extends ConsumerWidget {
             onPressed: () => consensusNotifier.checkAvailability(),
             style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
             child: const Text('Retry', style: TextStyle(fontSize: 11)),
+          ),
+          IconButton(
+            icon: const Icon(Icons.settings, size: 16),
+            tooltip: 'Configure Local AI Host',
+            visualDensity: VisualDensity.compact,
+            onPressed: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SettingsScreen()),
+              );
+              consensusNotifier.checkAvailability();
+            },
           ),
         ],
       ),
