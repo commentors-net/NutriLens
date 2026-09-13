@@ -1,0 +1,291 @@
+name: Build Mobile Apps (Android & iOS)
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump_type:
+        description: 'Version bump type'
+        required: true
+        default: 'none'
+        type: choice
+        options:
+          - 'none'
+          - 'build'
+          - 'patch'
+          - 'minor'
+          - 'major'
+      custom_version:
+        description: 'Custom version override (e.g. 0.2.0+5, leave blank to use bump_type)'
+        required: false
+        default: ''
+        type: string
+      build_android:
+        description: 'Build Android APK & AAB'
+        required: true
+        default: true
+        type: boolean
+      build_ios:
+        description: 'Build iOS IPA'
+        required: true
+        default: true
+        type: boolean
+
+  push:
+    branches:
+      - main
+    paths:
+      - 'app_flutter/**'
+      - '.github/workflows/build-mobile.yml'
+
+jobs:
+  version:
+    name: Resolve App Version
+    runs-on: ubuntu-latest
+    outputs:
+      version_name: ${{ steps.resolve_version.outputs.version_name }}
+      version_code: ${{ steps.resolve_version.outputs.version_code }}
+      full_version: ${{ steps.resolve_version.outputs.full_version }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Determine Version
+        id: resolve_version
+        run: |
+          BUMP_TYPE="${{ inputs.bump_type }}"
+          CUSTOM_VER="${{ inputs.custom_version }}"
+
+          if [ -n "$CUSTOM_VER" ]; then
+            python app_flutter/scripts/bump_version.py --set "$CUSTOM_VER" --note "GitHub Actions manual override"
+          elif [ "$BUMP_TYPE" != "none" ] && [ -n "$BUMP_TYPE" ]; then
+            python app_flutter/scripts/bump_version.py --type "$BUMP_TYPE" --note "GitHub Actions $BUMP_TYPE bump"
+          fi
+
+          FULL_VER=$(python app_flutter/scripts/bump_version.py --get --quiet)
+          VER_NAME=$(echo "$FULL_VER" | cut -d'+' -f1)
+          VER_CODE=$(echo "$FULL_VER" | cut -d'+' -f2)
+
+          echo "version_name=$VER_NAME" >> $GITHUB_OUTPUT
+          echo "version_code=$VER_CODE" >> $GITHUB_OUTPUT
+          echo "full_version=$FULL_VER" >> $GITHUB_OUTPUT
+
+          echo "Resolved App Version: $FULL_VER (Name: $VER_NAME, Code: $VER_CODE)"
+
+  build-android:
+    name: Build Android (APK & AAB)
+    needs: version
+    if: ${{ inputs.build_android != false }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Check Flutter environment
+        run: flutter doctor -v
+
+      - name: Setup Google Services configuration
+        working-directory: app_flutter
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          mkdir -p android/app
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            echo "$GOOGLE_SERVICES_JSON" | base64 --decode > android/app/google-services.json
+            echo "Decoded google-services.json from repository secret."
+          elif [ ! -f "android/app/google-services.json" ]; then
+            cat << 'EOF' > android/app/google-services.json
+          {
+            "project_info": {
+              "project_number": "427212681311",
+              "project_id": "leave-tracker-2025",
+              "storage_bucket": "leave-tracker-2025.firebasestorage.app"
+            },
+            "client": [
+              {
+                "client_info": {
+                  "mobilesdk_app_id": "1:427212681311:android:0b4771b19134f10e0e6bea",
+                  "android_client_info": {
+                    "package_name": "com.foodvision.app"
+                  }
+                },
+                "oauth_client": [
+                  {
+                    "client_id": "427212681311-ihqk4pg17qlj04lceo10mvuad99dh9qe.apps.googleusercontent.com",
+                    "client_type": 1,
+                    "android_info": {
+                      "package_name": "com.foodvision.app",
+                      "certificate_hash": "76f0402154e65d2ee62e0d5e677fa2d56bb4ca98"
+                    }
+                  }
+                ],
+                "api_key": [
+                  {
+                    "current_key": "AIzaSyDpAmYmO2Uo-C-mnSk_PwxsVgFdrYwEoGg"
+                  }
+                ],
+                "services": {}
+              }
+            ],
+            "configuration_version": "1"
+          }
+          EOF
+            echo "Synthesized baseline google-services.json for build."
+          fi
+
+      - name: Install dependencies
+        working-directory: app_flutter
+        run: flutter pub get
+
+      - name: Run Flutter Tests
+        working-directory: app_flutter
+        run: flutter test
+
+      - name: Build Android Release APK
+        working-directory: app_flutter
+        env:
+          FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+        run: |
+          flutter build apk --release \
+            --build-name="${{ needs.version.outputs.version_name }}" \
+            --build-number="${{ needs.version.outputs.version_code }}"
+
+      - name: Build Android Release App Bundle (AAB)
+        working-directory: app_flutter
+        env:
+          FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+        run: |
+          flutter build appbundle --release \
+            --build-name="${{ needs.version.outputs.version_name }}" \
+            --build-number="${{ needs.version.outputs.version_code }}"
+
+      - name: Rename artifacts
+        run: |
+          cp app_flutter/build/app/outputs/flutter-apk/app-release.apk FoodVision-v${{ needs.version.outputs.full_version }}.apk
+          cp app_flutter/build/app/outputs/bundle/release/app-release.aab FoodVision-v${{ needs.version.outputs.full_version }}.aab
+
+      - name: Upload Android APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: FoodVision-v${{ needs.version.outputs.full_version }}-Android-APK
+          path: FoodVision-v${{ needs.version.outputs.full_version }}.apk
+          retention-days: 14
+
+      - name: Upload Android AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: FoodVision-v${{ needs.version.outputs.full_version }}-Android-AAB
+          path: FoodVision-v${{ needs.version.outputs.full_version }}.aab
+          retention-days: 14
+
+  build-ios:
+    name: Build iOS (IPA)
+    needs: version
+    if: ${{ inputs.build_ios != false }}
+    runs-on: macos-15
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: 'latest-stable'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Disable Swift Package Manager and UIScene Migration
+        run: |
+          flutter config --no-enable-swift-package-manager
+          flutter config --no-enable-uiscene-migration
+
+      - name: Check Flutter and Xcode environment
+        run: |
+          flutter doctor -v
+          xcodebuild -version
+
+      - name: Install Flutter dependencies
+        working-directory: app_flutter
+        run: flutter pub get
+
+      - name: Build iOS Release (Unsigned)
+        working-directory: app_flutter
+        env:
+          FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+        run: |
+          if [ -n "$FIREBASE_API_KEY" ]; then
+            flutter build ios --release --no-codesign \
+              --build-name="${{ needs.version.outputs.version_name }}" \
+              --build-number="${{ needs.version.outputs.version_code }}" \
+              --dart-define=FIREBASE_API_KEY="$FIREBASE_API_KEY"
+          else
+            flutter build ios --release --no-codesign \
+              --build-name="${{ needs.version.outputs.version_name }}" \
+              --build-number="${{ needs.version.outputs.version_code }}"
+          fi
+
+      - name: Package Runner.app into FoodVision.ipa
+        run: |
+          mkdir -p ipa_out/Payload
+          cp -R app_flutter/build/ios/iphoneos/Runner.app ipa_out/Payload/
+          cd ipa_out
+          zip -qr ../FoodVision-v${{ needs.version.outputs.full_version }}.ipa Payload
+          cd ..
+          ls -lh FoodVision-v${{ needs.version.outputs.full_version }}.ipa
+
+      - name: Upload FoodVision iOS IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: FoodVision-v${{ needs.version.outputs.full_version }}-iOS-IPA
+          path: FoodVision-v${{ needs.version.outputs.full_version }}.ipa
+          retention-days: 14
+
+  summary:
+    name: Build Summary
+    needs: [version, build-android, build-ios]
+    if: always()
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Generate Workflow Summary
+        run: |
+          cat << 'EOF' >> $GITHUB_STEP_SUMMARY
+          # 📱 FoodVision Mobile Build Summary
+
+          - **Version:** `${{ needs.version.outputs.full_version }}`
+          - **Version Name:** `${{ needs.version.outputs.version_name }}`
+          - **Build Code:** `${{ needs.version.outputs.version_code }}`
+
+          | Platform | Artifact | Status |
+          | :--- | :--- | :--- |
+          | Android APK | `FoodVision-v${{ needs.version.outputs.full_version }}.apk` | ${{ needs.build-android.result }} |
+          | Android AAB | `FoodVision-v${{ needs.version.outputs.full_version }}.aab` | ${{ needs.build-android.result }} |
+          | iOS IPA | `FoodVision-v${{ needs.version.outputs.full_version }}.ipa` | ${{ needs.build-ios.result }} |
+
+          *Artifacts are retained for 14 days and can be downloaded from the run artifacts section.*
+          EOF

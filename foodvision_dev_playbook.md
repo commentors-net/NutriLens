@@ -37,6 +37,11 @@
   - Created `MealPhotoAnalyzer.tsx` component with drag-and-drop file upload, photo previews, editable food items and portions, auto macro recalculation, and direct meal logging.
   - Integrated `MealPhotoAnalyzer` into `NutriLensPortal.tsx` and `NutriLensMeals.tsx`.
   - Verified full TypeScript compilation and Vite build with 0 errors.
+- [x] **Phase 6: Automated Version Bumping & Unified CI/CD (Android & iOS)** (COMPLETED & VERIFIED)
+  - Created automated version manager `app_flutter/scripts/bump_version.py` supporting `patch`, `minor`, `major`, `build`, and custom version overrides.
+  - Created central release log `VERSION_HISTORY.md` at repository root tracking all mobile versions, build codes, dates, and triggers.
+  - Implemented unified GitHub Action `.github/workflows/build-mobile.yml` that builds both Android (APK & AAB) and iOS (IPA) under the same release execution and synchronizes their version names and codes.
+  - Retired single-platform `.github/workflows/build-ios.yml`.
 
 ---
 
