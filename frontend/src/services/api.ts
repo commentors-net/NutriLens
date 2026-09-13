@@ -438,6 +438,42 @@ export interface MealPhotoAccessResponse {
   errors: Array<{ source_url: string; error: string }>;
 }
 
+export interface AnalyzeItem {
+  item_id: string;
+  label: string;
+  label_confidence: number;
+  grams_estimate: number;
+  grams_range: { min: number; max: number };
+  grams_confidence: number;
+  macros: Macros;
+  original_label?: string;
+  original_grams_estimate?: number;
+}
+
+export interface AnalyzeMealResponse {
+  overall_confidence: number;
+  needs_more_photos: boolean;
+  suggested_next_shots: string[];
+  items: AnalyzeItem[];
+  warnings: string[];
+}
+
+export interface SaveMealRequestItem {
+  label: string;
+  grams: number;
+  macros: Macros;
+  original_label?: string;
+  original_grams?: number;
+  corrected?: boolean;
+}
+
+export interface SaveMealPayload {
+  items: SaveMealRequestItem[];
+  notes?: string;
+  image_urls?: string[];
+  timestamp?: string;
+}
+
 export interface CorrectionLabelStat {
   label: string;
   count: number;
@@ -665,6 +701,53 @@ export const mealsApi = {
         image_url: imageUrl,
       },
     });
+    return response.data;
+  },
+
+  analyzeMealPhotos: async (
+    files: File[],
+    metadata?: Record<string, any>
+  ): Promise<AnalyzeMealResponse> => {
+    const formData = new FormData();
+    files.forEach((file) => {
+      formData.append("images", file);
+    });
+    // Ensure minimum 3 images required by backend
+    if (files.length > 0 && files.length < 3) {
+      for (let i = files.length; i < 3; i++) {
+        formData.append("images", files[0]);
+      }
+    }
+    if (metadata) {
+      formData.append("metadata", JSON.stringify(metadata));
+    }
+    const response = await apiClient.post(`${config.apiUrl}/meals/analyze`, formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+    return response.data;
+  },
+
+  saveMealWithImages: async (
+    payload: SaveMealPayload,
+    images: File[] = []
+  ): Promise<any> => {
+    const formData = new FormData();
+    formData.append("payload", JSON.stringify(payload));
+    images.forEach((file) => {
+      formData.append("images", file);
+    });
+    const response = await apiClient.post(`${config.apiUrl}/meals/with-images`, formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+    return response.data;
+  },
+
+  saveMealDirect: async (payload: SaveMealPayload): Promise<any> => {
+    const response = await apiClient.post(`${config.apiUrl}/meals`, payload);
     return response.data;
   },
 };

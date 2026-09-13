@@ -11,7 +11,59 @@
 
 ---
 
-## RESUME HERE - Last session: 2026-09-05 - iOS Cloud Build Pipeline (GitHub Actions) + iPhone Testing Setup
+## ACTIVE ROADMAP & IMPLEMENTATION PLAN (2026-09-12)
+
+### Milestone Execution Order for Missing Features:
+- [x] **Phase 1: User Profile & Nutritional Goals on Mobile** (COMPLETED & VERIFIED)
+  - Connect mobile app to existing backend endpoints (`GET /nutrilens/auth/nutrilens-profile`, `PATCH /nutrilens/auth/nutrilens-profile`).
+  - Created `NutriLensProfile` model and `ProfileService` / Riverpod providers in `app_flutter`.
+  - Built `ProfileScreen` in mobile to configure: daily calorie target, protein (g), carbs (g), fat (g), meal reminders, and dietary restrictions.
+  - Wired goals into `HomeScreen`: dynamic progress bars for calories, protein, carbs, and fat (consumed vs target).
+  - Added navigation link from Settings and router to Profile screen.
+- [x] **Phase 2: Cloud Photo Storage & Remote Meal Sync on Mobile** (COMPLETED & VERIFIED)
+  - Updated backend `POST /meals` and `POST /meals/with-images` to return uploaded `image_urls`.
+  - Updated `FoodVisionClient` and `AnalysisProvider` to persist photos to Google Cloud Storage (`POST /meals/with-images`).
+  - Implemented `syncRemoteMeals` in `SavedMealsController` to sync remote meals into local SQLite.
+  - Added pull-to-refresh and Cloud Sync button on `SavedMealsScreen`.
+- [x] **Phase 3: Mobile History Trends, Visualizations & Data Export** (COMPLETED & VERIFIED)
+  - Upgraded `MealHistoryScreen` with dynamic macro breakdown analytics cards, protein/carbs/fat ratio bar, and 7-day intake trend bars.
+  - Added Export feature in mobile calling `GET /meals/export?format=csv|pdf` with local file saving and notification.
+- [x] **Phase 4: Guided Camera Multi-Angle Overlays** (COMPLETED & VERIFIED)
+  - Created `ViewfinderOverlay` with custom reticle painter, angle badges (Top-down, 45° angle, side closeup), and positioning guides.
+  - Integrated overlay into `CaptureScreen` with sleek top counter header and custom angle guidance.
+  - Added AI Multi-Angle Guidance card in `ResultsScreen` with interactive retake chips forwarding suggested shots to camera.
+- [x] **Phase 5: Web Direct Food Photo Analysis** (COMPLETED & VERIFIED)
+  - Added `mealsApi.analyzeMealPhotos` and `mealsApi.saveMealWithImages` to frontend API client.
+  - Created `MealPhotoAnalyzer.tsx` component with drag-and-drop file upload, photo previews, editable food items and portions, auto macro recalculation, and direct meal logging.
+  - Integrated `MealPhotoAnalyzer` into `NutriLensPortal.tsx` and `NutriLensMeals.tsx`.
+  - Verified full TypeScript compilation and Vite build with 0 errors.
+
+---
+
+## ARCHITECTURE PROPOSAL: Hybrid Cloud-Local AI (Ollama + Gemini Consensus)
+> **Status:** APPROVED PROPOSAL (Implementation will commence immediately after completing the core missing features above).
+
+### 1. Concept Summary
+A two-tier **Mixture-of-Agents (MoA) / Consensus Architecture**:
+1. **Tier 1 (Fast Cloud Path — Default)**:
+   - User captures meal photos on mobile -> sent to Backend -> Google Gemini 2.5 Flash produces rapid multimodal analysis in ~1–2 seconds.
+   - Mobile displays immediate nutrition totals without making the user wait.
+2. **Tier 2 (Deep Local Second Opinion — Optional On-Demand)**:
+   - User has an option on the Results screen: **"Deep AI Second Opinion"**.
+   - Mobile sends images directly to local Ollama server running on LAN at `http://192.168.0.200:11434` (running a dedicated multimodal vision model like `llama3.2-vision`, `qwen2.5-vl`, or `llava`).
+   - The dedicated local agent takes 20–45 seconds performing exhaustive visual reasoning: inspecting food texture, sheen for hidden oils/butters, cultural recipes, ingredient segregation, and volumetric density.
+   - When complete, mobile notifies the user and displays the local model's detailed breakdown alongside Gemini's initial estimate.
+3. **Tier 3 (Arbitration & Consensus Re-sync)**:
+   - User taps **"Re-sync & Finalize"**.
+   - Mobile sends both the initial Gemini output and the local LLM output to Backend endpoint `POST /meals/synthesize`.
+   - Gemini acts as the **Senior Arbitrator / Synthesizer**: reconciles discrepancies between cloud and local analyses, decides the final authoritative grams and macros, updates the database, and syncs the consolidated meal to the app.
+
+### 2. Technical Prerequisites for Proposal
+- **Local Network Ping**: Mobile app checks connectivity to `http://192.168.0.200:11434/api/tags`. If on home Wi-Fi, enable the feature; if on cellular 5G away from home, gracefully indicate "Local AI Available on Home Wi-Fi" (or connect via Tailscale).
+- **iOS App Transport Security (ATS)**: Ensure `NSAllowsLocalNetworking: true` is configured in `Info.plist` for local cleartext HTTP communication on `192.168.0.x`.
+- **Backend Synthesizer Endpoint**: Add `POST /meals/synthesize` in `backend/app/api/routes_meals.py` with structured Gemini arbitration prompt.
+
+---
 
 STATUS AT SESSION END (2026-09-05):
 - Resolved mobile testing obstacle on Windows without a Mac: enabled cloud iOS compilation via GitHub Actions.

@@ -2,12 +2,12 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../core/models/meal_draft.dart';
-import '../../core/storage/meal_draft_db.dart';
-import '../capture/capture_controller.dart';
-import '../results/analysis_provider.dart';
-import '../../app/router.dart';
-import 'meals_provider.dart';
+import 'package:foodvision/core/models/meal_draft.dart';
+import 'package:foodvision/core/storage/meal_draft_db.dart';
+import 'package:foodvision/features/capture/capture_controller.dart';
+import 'package:foodvision/features/results/analysis_provider.dart';
+import 'package:foodvision/app/router.dart';
+import 'package:foodvision/features/meals/meals_provider.dart';
 
 /// Detail screen for viewing and editing a meal draft or saved meal
 class MealDetailScreen extends ConsumerStatefulWidget {
@@ -15,10 +15,10 @@ class MealDetailScreen extends ConsumerStatefulWidget {
   final String? savedMealId;
 
   const MealDetailScreen({
-    Key? key,
+    super.key,
     this.draftId,
     this.savedMealId,
-  }) : super(key: key);
+  });
 
   @override
   ConsumerState<MealDetailScreen> createState() => _MealDetailScreenState();
@@ -125,7 +125,7 @@ class _MealDetailScreenState extends ConsumerState<MealDetailScreen> {
                   color: Colors.white,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
+                      color: Colors.black.withValues(alpha: 0.05),
                       blurRadius: 10,
                       offset: const Offset(0, -2),
                     ),

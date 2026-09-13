@@ -3,12 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:camera/camera.dart';
 import 'package:go_router/go_router.dart';
 import 'capture_controller.dart';
-import '../../app/router.dart';
-import '../../core/utils/permission_handler.dart' as app_permissions;
+import 'viewfinder_overlay.dart';
+import 'package:foodvision/app/router.dart';
+import 'package:foodvision/core/utils/permission_handler.dart' as app_permissions;
 
 /// Camera capture screen for taking multiple photos of a meal
 class CaptureScreen extends ConsumerStatefulWidget {
-  const CaptureScreen({Key? key}) : super(key: key);
+  final String? suggestedShotPrompt;
+
+  const CaptureScreen({super.key, this.suggestedShotPrompt});
 
   @override
   ConsumerState<CaptureScreen> createState() => _CaptureScreenState();
@@ -159,7 +162,16 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
           child: CameraPreview(_cameraController!),
         ),
 
-        // Guidance overlay
+        // Guided multi-angle viewfinder overlay
+        Positioned.fill(
+          child: ViewfinderOverlay(
+            photoCount: captureState.photoCount,
+            minPhotos: captureState.minPhotos,
+            customGuidance: widget.suggestedShotPrompt,
+          ),
+        ),
+
+        // Guidance overlay counter
         _buildGuidanceOverlay(captureState),
 
         // Bottom controls
@@ -213,52 +225,58 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
       left: 0,
       right: 0,
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Colors.black.withValues(alpha: 0.7),
+              Colors.black.withValues(alpha: 0.75),
               Colors.transparent,
             ],
           ),
         ),
-        child: Column(
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             // Photo counter
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
               decoration: BoxDecoration(
                 color: captureState.hasMinPhotos
                     ? Colors.green.withValues(alpha: 0.9)
                     : Colors.orange.withValues(alpha: 0.9),
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: Text(
-                'Photos: ${captureState.photoCount} / ${captureState.minPhotos}',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.camera_alt, color: Colors.white, size: 16),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Photos: ${captureState.photoCount} / ${captureState.minPhotos}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 12),
-
-            // Guidance text
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.6),
-                borderRadius: BorderRadius.circular(8),
+                color: Colors.black.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white24),
               ),
               child: Text(
-                captureState.suggestedNextShot,
-                textAlign: TextAlign.center,
+                'Max ${captureState.maxPhotos} shots',
                 style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
+                  color: Colors.white70,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ),

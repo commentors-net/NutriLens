@@ -25,8 +25,10 @@ import {
 import RestaurantIcon from "@mui/icons-material/Restaurant";
 import LocalFireDepartmentIcon from "@mui/icons-material/LocalFireDepartment";
 import FitnessCenterIcon from "@mui/icons-material/FitnessCenter";
+import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import { authApi, mealsApi } from "@services/api";
 import type { MealTotalResponse, Meal, MealItem } from "@services/api";
+import MealPhotoAnalyzer from "@/components/MealPhotoAnalyzer";
 
 export default function NutriLensMeals() {
   const [mealData, setMealData] = useState<MealTotalResponse | null>(null);
@@ -37,6 +39,7 @@ export default function NutriLensMeals() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [checkedAdmin, setCheckedAdmin] = useState(false);
   const [imageAccessMap, setImageAccessMap] = useState<Record<string, string>>({});
+  const [showAnalyzer, setShowAnalyzer] = useState(false);
 
   const resolveMealImageUrls = async (meals: Meal[]) => {
     const rawUrls = meals.flatMap((meal) => meal.image_urls || []);
@@ -161,7 +164,7 @@ export default function NutriLensMeals() {
               Track your daily nutrition
             </Typography>
           </Box>
-          <Stack direction="row" spacing={2}>
+          <Stack direction="row" spacing={2} flexWrap="wrap">
             <TextField
               type="date"
               value={selectedDate}
@@ -172,9 +175,28 @@ export default function NutriLensMeals() {
             <Button variant="outlined" onClick={handleRefresh} disabled={refreshing}>
               {refreshing ? "Refreshing..." : "Refresh"}
             </Button>
+            <Button
+              variant={showAnalyzer ? "contained" : "outlined"}
+              color="primary"
+              startIcon={<AutoAwesomeIcon />}
+              onClick={() => setShowAnalyzer((v) => !v)}
+            >
+              {showAnalyzer ? "Close AI Analyzer" : "Log Meal with AI Photo"}
+            </Button>
           </Stack>
         </Stack>
       </Box>
+
+      {/* AI Photo Analyzer Collapse Section */}
+      {showAnalyzer && (
+        <Box sx={{ mb: 4 }}>
+          <MealPhotoAnalyzer
+            onMealSaved={() => {
+              fetchMeals();
+            }}
+          />
+        </Box>
+      )}
 
       {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
 

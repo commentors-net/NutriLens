@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
-import '../models/meal_draft.dart';
+import 'package:foodvision/core/models/meal_draft.dart';
 
 /// Local database for storing meal drafts and analyzed meals
 class MealDraftDatabase {

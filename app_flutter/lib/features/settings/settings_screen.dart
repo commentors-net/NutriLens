@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../core/config/environment.dart';
-import '../../core/auth/auth_service.dart';
-import '../../core/services/app_log_service.dart';
-import '../auth/auth_provider.dart';
+import 'package:foodvision/core/config/environment.dart';
+import 'package:foodvision/core/auth/auth_service.dart';
+import 'package:foodvision/core/services/app_log_service.dart';
+import 'package:foodvision/features/auth/auth_provider.dart';
+import 'package:foodvision/app/router.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
-  const SettingsScreen({Key? key}) : super(key: key);
+  const SettingsScreen({super.key});
 
   @override
   ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
@@ -164,10 +165,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.blue.withOpacity(0.1),
+                        color: Colors.blue.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                          color: Colors.blue.withOpacity(0.3),
+                          color: Colors.blue.withValues(alpha: 0.3),
                         ),
                       ),
                       child: const Text(
@@ -180,6 +181,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ),
                   ],
                 ),
+              ),
+            ),
+            // Nutritional Goals & Profile Section
+            Card(
+              child: ListTile(
+                leading: const CircleAvatar(
+                  backgroundColor: Colors.deepOrange,
+                  foregroundColor: Colors.white,
+                  child: Icon(Icons.person),
+                ),
+                title: const Text(
+                  'Profile & Nutrition Goals',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                subtitle: const Text('Set calorie & macro targets, dietary restrictions, and reminders'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push(AppRoutes.profile),
               ),
             ),
             const SizedBox(height: 16),
@@ -269,8 +287,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           ),
                           decoration: BoxDecoration(
                             color: currentEnvironment == AppEnvironment.live
-                                ? Colors.green.withOpacity(0.2)
-                                : Colors.orange.withOpacity(0.2),
+                                ? Colors.green.withValues(alpha: 0.2)
+                                : Colors.orange.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(

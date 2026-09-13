@@ -1,13 +1,13 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/models/meal_draft.dart';
-import 'meals_provider.dart';
+import 'package:foodvision/core/models/meal_draft.dart';
+import 'package:foodvision/features/meals/meals_provider.dart';
 import 'meal_detail_screen.dart';
 
 /// Screen showing saved meal drafts and analyzed meals
 class SavedMealsScreen extends ConsumerWidget {
-  const SavedMealsScreen({Key? key}) : super(key: key);
+  const SavedMealsScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -19,6 +19,38 @@ class SavedMealsScreen extends ConsumerWidget {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('My Meals'),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.cloud_sync),
+              tooltip: 'Sync with Cloud',
+              onPressed: () async {
+                try {
+                  final count = await ref
+                      .read(savedMealsControllerProvider.notifier)
+                      .syncRemoteMeals();
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(count > 0
+                            ? 'Synced $count new meals from cloud!'
+                            : 'All meals are up to date with cloud.'),
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Sync failed: $e'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                }
+              },
+            ),
+          ],
           bottom: const TabBar(
             tabs: [
               Tab(icon: Icon(Icons.photo_library), text: 'Drafts'),
@@ -266,26 +298,44 @@ class _SavedMealsListView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (meals.isEmpty) {
-      return const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.restaurant_outlined, size: 64, color: Colors.grey),
-            SizedBox(height: 16),
-            Text('No analyzed meals yet', style: TextStyle(color: Colors.grey)),
+      return RefreshIndicator(
+        onRefresh: () =>
+            ref.read(savedMealsControllerProvider.notifier).syncRemoteMeals(),
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: const [
+            SizedBox(height: 120),
+            Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.restaurant_outlined, size: 64, color: Colors.grey),
+                  SizedBox(height: 16),
+                  Text('No analyzed meals yet', style: TextStyle(color: Colors.grey)),
+                  SizedBox(height: 8),
+                  Text('Pull down or tap sync icon to load from cloud',
+                      style: TextStyle(color: Colors.grey, fontSize: 12)),
+                ],
+              ),
+            ),
           ],
         ),
       );
     }
 
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      itemCount: meals.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
-      itemBuilder: (context, index) {
-        final meal = meals[index];
-        return _SavedMealCard(meal: meal);
-      },
+    return RefreshIndicator(
+      onRefresh: () =>
+          ref.read(savedMealsControllerProvider.notifier).syncRemoteMeals(),
+      child: ListView.separated(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        itemCount: meals.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 12),
+        itemBuilder: (context, index) {
+          final meal = meals[index];
+          return _SavedMealCard(meal: meal);
+        },
+      ),
     );
   }
 }
@@ -436,7 +486,7 @@ class _MacroChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: (color ?? Colors.blue).withOpacity(0.1),
+        color: (color ?? Colors.blue).withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Text(

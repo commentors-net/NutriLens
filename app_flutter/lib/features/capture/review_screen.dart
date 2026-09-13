@@ -3,13 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'capture_controller.dart';
-import '../../app/router.dart';
-import '../results/analysis_provider.dart';
-import '../meals/meals_provider.dart';
+import 'package:foodvision/app/router.dart';
+import 'package:foodvision/features/results/analysis_provider.dart';
+import 'package:foodvision/features/meals/meals_provider.dart';
 
 /// Review screen for viewing and managing captured photos before analysis
 class ReviewScreen extends ConsumerWidget {
-  const ReviewScreen({Key? key}) : super(key: key);
+  const ReviewScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

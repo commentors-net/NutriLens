@@ -7,7 +7,8 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../auth/auth_service.dart';
+import 'package:foodvision/core/auth/auth_service.dart';
+import 'package:foodvision/core/utils/device_info.dart';
 
 enum LogUploadScope {
   today,
@@ -197,7 +198,7 @@ class AppLogService {
     LogUploadScope scope = LogUploadScope.today,
     DateTime? startDate,
     DateTime? endDate,
-    String appVersion = "0.1.0",
+    String? appVersion,
   }) async {
     final consent = await isUploadConsentGranted();
     if (!consent) {
@@ -212,6 +213,10 @@ class AppLogService {
     final token = await authService.getIdToken();
     final uri = Uri.parse("$baseUrl/meals/logs");
 
+    final effectiveAppVersion = appVersion ?? DeviceInfo.getAppVersion();
+    final effectivePlatform = DeviceInfo.getDevicePlatform();
+    final effectiveLocale = DeviceInfo.getDeviceLocale();
+
     final response = await http.post(
       uri,
       headers: {
@@ -219,8 +224,9 @@ class AppLogService {
         if (token != null && token.isNotEmpty) "Authorization": "Bearer $token",
       },
       body: jsonEncode({
-        "app_version": appVersion,
-        "platform": Platform.operatingSystem,
+        "app_version": effectiveAppVersion,
+        "platform": effectivePlatform,
+        "locale": effectiveLocale,
         "environment": environment,
         "session_id": DateTime.now().millisecondsSinceEpoch.toString(),
         "log_scope": scope.apiValue,

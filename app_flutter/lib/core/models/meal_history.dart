@@ -33,17 +33,27 @@ class MealHistoryItem {
       imageUrls: rawImageUrls.whereType<String>().toList(),
     );
   }
+
+  double get totalProteinG => items.fold(0.0, (sum, i) => sum + i.proteinG);
+  double get totalCarbsG => items.fold(0.0, (sum, i) => sum + i.carbsG);
+  double get totalFatG => items.fold(0.0, (sum, i) => sum + i.fatG);
 }
 
 class MealHistoryFoodItem {
   final String label;
   final double grams;
   final int kcal;
+  final double proteinG;
+  final double carbsG;
+  final double fatG;
 
   MealHistoryFoodItem({
     required this.label,
     required this.grams,
     required this.kcal,
+    this.proteinG = 0.0,
+    this.carbsG = 0.0,
+    this.fatG = 0.0,
   });
 
   factory MealHistoryFoodItem.fromJson(Map<String, dynamic> json) {
@@ -51,6 +61,9 @@ class MealHistoryFoodItem {
       label: json['label'] as String? ?? 'food',
       grams: (json['grams'] as num?)?.toDouble() ?? 0,
       kcal: (json['kcal'] as num?)?.toInt() ?? 0,
+      proteinG: (json['protein_g'] as num?)?.toDouble() ?? 0.0,
+      carbsG: (json['carbs_g'] as num?)?.toDouble() ?? 0.0,
+      fatG: (json['fat_g'] as num?)?.toDouble() ?? 0.0,
     );
   }
 }

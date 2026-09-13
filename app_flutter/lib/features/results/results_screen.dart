@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../app/router.dart';
-import '../../core/models/analyze_response.dart';
-import '../capture/capture_controller.dart';
-import 'analysis_provider.dart';
+import 'package:foodvision/app/router.dart';
+import 'package:foodvision/core/models/analyze_response.dart';
+import 'package:foodvision/features/capture/capture_controller.dart';
+import 'package:foodvision/features/results/analysis_provider.dart';
 
 class ResultsScreen extends ConsumerWidget {
-  const ResultsScreen({Key? key}) : super(key: key);
+  const ResultsScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -177,14 +177,14 @@ class _ResultsView extends ConsumerWidget {
 
         const SizedBox(height: 24),
 
-        // Actions
-        if (response.needsMorePhotos)
-          OutlinedButton.icon(
-            onPressed: () => context.push(AppRoutes.capture),
-            icon: const Icon(Icons.add_a_photo),
-            label: const Text('Add More Photos for Better Accuracy'),
+        // AI Multi-Angle Guidance Card
+        if (response.needsMorePhotos || response.suggestedNextShots.isNotEmpty) ...[
+          _SuggestedShotsCard(
+            suggestedNextShots: response.suggestedNextShots,
+            onRetake: (prompt) => context.push(AppRoutes.capture, extra: prompt),
           ),
-        const SizedBox(height: 12),
+          const SizedBox(height: 16),
+        ],
 
         // Save Meal button — watches save state
         _SaveMealButton(response: response),
@@ -559,6 +559,114 @@ class _SaveMealButton extends ConsumerWidget {
           label: const Text('Save Meal'),
         );
       },
+    );
+  }
+}
+
+class _SuggestedShotsCard extends StatelessWidget {
+  final List<String> suggestedNextShots;
+  final void Function(String? prompt) onRetake;
+
+  const _SuggestedShotsCard({
+    required this.suggestedNextShots,
+    required this.onRetake,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.amber.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.amber.withValues(alpha: 0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: Colors.amber.withValues(alpha: 0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.auto_awesome, color: Colors.amber, size: 18),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'AI Multi-Angle Recommendations',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'To boost measurement accuracy and detect hidden ingredients, try capturing:',
+            style: TextStyle(fontSize: 13, color: Colors.grey),
+          ),
+          const SizedBox(height: 10),
+          if (suggestedNextShots.isNotEmpty)
+            ...suggestedNextShots.map(
+              (shot) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 3),
+                child: InkWell(
+                  onTap: () => onRetake(shot),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.amber.withValues(alpha: 0.25)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.camera_alt_outlined, size: 16, color: Colors.amber),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            shot,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                        const Icon(Icons.arrow_forward_ios, size: 12, color: Colors.amber),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            )
+          else
+            OutlinedButton.icon(
+              onPressed: () => onRetake(null),
+              icon: const Icon(Icons.add_a_photo),
+              label: const Text('Capture Additional Angles'),
+            ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () => onRetake(
+                suggestedNextShots.isNotEmpty ? suggestedNextShots.first : null,
+              ),
+              icon: const Icon(Icons.add_a_photo, size: 18),
+              label: const Text('Add Angle Photos Now'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.amber.shade700,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

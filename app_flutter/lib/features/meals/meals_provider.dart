@@ -1,7 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
-import '../../core/models/meal_draft.dart';
-import '../../core/storage/meal_draft_db.dart';
+import 'package:foodvision/core/api/food_vision_client.dart';
+import 'package:foodvision/core/models/meal_draft.dart';
+import 'package:foodvision/core/storage/meal_draft_db.dart';
 
 /// Provider for meal draft database
 final mealDraftDbProvider = Provider<MealDraftDatabase>((ref) {
@@ -105,9 +107,11 @@ final mealDraftsControllerProvider =
 /// Controller for managing saved meals
 class SavedMealsController extends StateNotifier<AsyncValue<void>> {
   final MealDraftDatabase _db;
+  final FoodVisionClient _client;
   final Ref _ref;
 
-  SavedMealsController(this._db, this._ref) : super(const AsyncValue.data(null));
+  SavedMealsController(this._db, this._client, this._ref)
+      : super(const AsyncValue.data(null));
 
   /// Save analyzed meal
   Future<String> saveMeal(SavedMeal meal) async {
@@ -117,6 +121,66 @@ class SavedMealsController extends StateNotifier<AsyncValue<void>> {
       state = const AsyncValue.data(null);
       _ref.invalidate(savedMealsProvider);
       return meal.id;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      rethrow;
+    }
+  }
+
+  /// Sync meals from the remote backend into local SQLite storage
+  Future<int> syncRemoteMeals({int lookbackDays = 30}) async {
+    state = const AsyncValue.loading();
+    try {
+      final today = DateTime.now();
+      final endStr = DateFormat('yyyy-MM-dd').format(today);
+      final startStr = DateFormat('yyyy-MM-dd')
+          .format(today.subtract(Duration(days: lookbackDays)));
+
+      final historyResponse = await _client.getMealsByRange(
+        start: startStr,
+        end: endStr,
+      );
+
+      int synced = 0;
+      for (final remoteMeal in historyResponse.meals) {
+        if (remoteMeal.mealId.isEmpty) continue;
+
+        final existing = await _db.getSavedMealById(remoteMeal.mealId);
+        if (existing == null) {
+          final savedMeal = SavedMeal(
+            id: remoteMeal.mealId,
+            name: remoteMeal.notes.isNotEmpty
+                ? remoteMeal.notes
+                : 'Meal ${DateFormat('yyyy-MM-dd HH:mm').format(remoteMeal.timestamp.toLocal())}',
+            analyzedAt: remoteMeal.timestamp.toLocal(),
+            items: remoteMeal.items
+                .map(
+                  (it) => MealItem(
+                    itemId: it.label,
+                    label: it.label,
+                    grams: it.grams,
+                    kcal: it.kcal.toDouble(),
+                    proteinG: it.proteinG,
+                    carbsG: it.carbsG,
+                    fatG: it.fatG,
+                  ),
+                )
+                .toList(),
+            totalKcal: remoteMeal.totalKcal.toDouble(),
+            totalProteinG: remoteMeal.totalProteinG,
+            totalCarbsG: remoteMeal.totalCarbsG,
+            totalFatG: remoteMeal.totalFatG,
+          );
+          await _db.insertSavedMeal(savedMeal);
+          synced++;
+        }
+      }
+
+      state = const AsyncValue.data(null);
+      if (synced > 0) {
+        _ref.invalidate(savedMealsProvider);
+      }
+      return synced;
     } catch (e, st) {
       state = AsyncValue.error(e, st);
       rethrow;
@@ -150,5 +214,7 @@ class SavedMealsController extends StateNotifier<AsyncValue<void>> {
 
 final savedMealsControllerProvider =
     StateNotifierProvider<SavedMealsController, AsyncValue<void>>((ref) {
-  return SavedMealsController(ref.watch(mealDraftDbProvider), ref);
+  final db = ref.watch(mealDraftDbProvider);
+  final client = ref.watch(foodVisionClientProvider);
+  return SavedMealsController(db, client, ref);
 });

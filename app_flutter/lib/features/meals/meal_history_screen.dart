@@ -1,21 +1,24 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
 
-import '../../core/api/food_vision_client.dart';
-import '../../core/models/meal_history.dart';
+import 'package:foodvision/core/api/food_vision_client.dart';
+import 'package:foodvision/core/models/meal_history.dart';
 
-class MealHistoryScreen extends StatefulWidget {
+class MealHistoryScreen extends ConsumerStatefulWidget {
   const MealHistoryScreen({super.key});
 
   @override
-  State<MealHistoryScreen> createState() => _MealHistoryScreenState();
+  ConsumerState<MealHistoryScreen> createState() => _MealHistoryScreenState();
 }
 
-class _MealHistoryScreenState extends State<MealHistoryScreen> {
-  final FoodVisionClient _client = FoodVisionClient();
+class _MealHistoryScreenState extends ConsumerState<MealHistoryScreen> {
   late DateTime _startDate;
   late DateTime _endDate;
   late Future<MealHistoryResponse> _historyFuture;
+  bool _isExporting = false;
 
   @override
   void initState() {
@@ -27,7 +30,8 @@ class _MealHistoryScreenState extends State<MealHistoryScreen> {
   }
 
   Future<MealHistoryResponse> _fetch() {
-    return _client.getMealsByRange(
+    final client = ref.read(foodVisionClientProvider);
+    return client.getMealsByRange(
       start: _toDate(_startDate),
       end: _toDate(_endDate),
     );
@@ -69,10 +73,152 @@ class _MealHistoryScreenState extends State<MealHistoryScreen> {
     });
   }
 
+  Future<void> _handleExport(String format) async {
+    setState(() => _isExporting = true);
+    try {
+      final client = ref.read(foodVisionClientProvider);
+      final bytes = await client.exportMeals(
+        start: _toDate(_startDate),
+        end: _toDate(_endDate),
+        format: format,
+      );
+
+      final dir = await getApplicationDocumentsDirectory();
+      final fileName =
+          'nutrilens_meals_${_toDate(_startDate)}_to_${_toDate(_endDate)}.$format';
+      final file = File('${dir.path}/$fileName');
+      await file.writeAsBytes(bytes);
+
+      if (mounted) {
+        showModalBottomSheet(
+          context: context,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+          ),
+          builder: (context) {
+            return Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        format == 'csv' ? Icons.table_chart : Icons.picture_as_pdf,
+                        color: format == 'csv' ? Colors.green : Colors.red,
+                        size: 28,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Export Complete (${format.toUpperCase()})',
+                          style: const TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text('File saved to:\n${file.path}',
+                      style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                  const SizedBox(height: 8),
+                  Text('Size: ${(bytes.length / 1024).toStringAsFixed(1)} KB',
+                      style: const TextStyle(fontSize: 13)),
+                  const SizedBox(height: 16),
+                  if (format == 'csv') ...[
+                    const Text('Preview:',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 13)),
+                    const SizedBox(height: 4),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        String.fromCharCodes(bytes)
+                            .split('\n')
+                            .take(4)
+                            .join('\n'),
+                        style: const TextStyle(
+                            fontFamily: 'monospace', fontSize: 11),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Done'),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Export failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isExporting = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Meal History')),
+      appBar: AppBar(
+        title: const Text('Meal History & Trends'),
+        actions: [
+          if (_isExporting)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16),
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            )
+          else
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.download),
+              tooltip: 'Export Meals',
+              onSelected: _handleExport,
+              itemBuilder: (context) => const [
+                PopupMenuItem(
+                  value: 'csv',
+                  child: ListTile(
+                    leading: Icon(Icons.table_chart, color: Colors.green),
+                    title: Text('Export CSV'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'pdf',
+                  child: ListTile(
+                    leading: Icon(Icons.picture_as_pdf, color: Colors.red),
+                    title: Text('Export PDF'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+              ],
+            ),
+        ],
+      ),
       body: Column(
         children: [
           Padding(
@@ -160,27 +306,24 @@ class _MealHistoryScreenState extends State<MealHistoryScreen> {
                 final sortedDates = grouped.keys.toList()
                   ..sort((a, b) => b.compareTo(a));
 
+                final daysCount =
+                    _endDate.difference(_startDate).inDays + 1;
+
                 return ListView(
                   padding: const EdgeInsets.all(12),
                   children: [
-                    Card(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Meals: ${history.mealCount}'),
-                            Text('Calories: ${history.totalKcal} kcal'),
-                            Text(
-                              'Protein ${history.totalProteinG.toStringAsFixed(1)}g • '
-                              'Carbs ${history.totalCarbsG.toStringAsFixed(1)}g • '
-                              'Fat ${history.totalFatG.toStringAsFixed(1)}g',
-                            ),
-                          ],
-                        ),
-                      ),
+                    _HistoryAnalyticsCard(
+                      history: history,
+                      daysCount: daysCount > 0 ? daysCount : 1,
+                      grouped: grouped,
                     ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Logged Meals',
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
                     ...sortedDates.map((dateKey) {
                       final meals = grouped[dateKey]!
                         ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
@@ -193,6 +336,271 @@ class _MealHistoryScreenState extends State<MealHistoryScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _HistoryAnalyticsCard extends StatelessWidget {
+  final MealHistoryResponse history;
+  final int daysCount;
+  final Map<String, List<MealHistoryItem>> grouped;
+
+  const _HistoryAnalyticsCard({
+    required this.history,
+    required this.daysCount,
+    required this.grouped,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final avgKcal = (history.totalKcal / daysCount).round();
+
+    // Macro calories: protein (4 kcal/g), carbs (4 kcal/g), fat (9 kcal/g)
+    final proteinCal = history.totalProteinG * 4;
+    final carbsCal = history.totalCarbsG * 4;
+    final fatCal = history.totalFatG * 9;
+    final totalMacroCal = proteinCal + carbsCal + fatCal;
+
+    final proteinPct = totalMacroCal > 0 ? (proteinCal / totalMacroCal) : 0.0;
+    final carbsPct = totalMacroCal > 0 ? (carbsCal / totalMacroCal) : 0.0;
+    final fatPct = totalMacroCal > 0 ? (fatCal / totalMacroCal) : 0.0;
+
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.insights, color: Colors.deepOrange),
+                SizedBox(width: 8),
+                Text(
+                  'Nutrition Trends & Distribution',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Top Stat Tiles
+            Row(
+              children: [
+                Expanded(
+                  child: _StatBox(
+                    label: 'Total Kcal',
+                    value: '${history.totalKcal}',
+                    color: Colors.deepOrange,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _StatBox(
+                    label: 'Daily Avg',
+                    value: '$avgKcal kcal',
+                    color: Colors.teal,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _StatBox(
+                    label: 'Meals',
+                    value: '${history.mealCount}',
+                    color: Colors.indigo,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+
+            // Macro Distribution Bar
+            const Text(
+              'Calorie Distribution by Macro',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: SizedBox(
+                height: 12,
+                child: Row(
+                  children: [
+                    if (proteinPct > 0)
+                      Expanded(
+                        flex: (proteinPct * 100).round().clamp(1, 100),
+                        child: Container(color: Colors.blue),
+                      ),
+                    if (carbsPct > 0)
+                      Expanded(
+                        flex: (carbsPct * 100).round().clamp(1, 100),
+                        child: Container(color: Colors.amber.shade700),
+                      ),
+                    if (fatPct > 0)
+                      Expanded(
+                        flex: (fatPct * 100).round().clamp(1, 100),
+                        child: Container(color: Colors.purple),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            // Macro Legend
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _MacroLegend(
+                  label: 'Protein',
+                  grams: history.totalProteinG,
+                  percentage: (proteinPct * 100).round(),
+                  color: Colors.blue,
+                ),
+                _MacroLegend(
+                  label: 'Carbs',
+                  grams: history.totalCarbsG,
+                  percentage: (carbsPct * 100).round(),
+                  color: Colors.amber.shade700,
+                ),
+                _MacroLegend(
+                  label: 'Fat',
+                  grams: history.totalFatG,
+                  percentage: (fatPct * 100).round(),
+                  color: Colors.purple,
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Daily Calorie Intake Bars
+            const Divider(),
+            const SizedBox(height: 8),
+            const Text(
+              'Daily Intake Breakdown',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            ...grouped.entries.take(7).map((entry) {
+              final dayTotal = entry.value
+                  .fold<int>(0, (sum, meal) => sum + meal.totalKcal);
+              const maxDay = 2500;
+              final fraction = (dayTotal / maxDay).clamp(0.0, 1.0);
+
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 50,
+                      child: Text(
+                        entry.key.length >= 5 ? entry.key.substring(5) : entry.key,
+                        style: const TextStyle(
+                            fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: LinearProgressIndicator(
+                          value: fraction,
+                          minHeight: 8,
+                          backgroundColor: Colors.grey.shade100,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            dayTotal > 2000
+                                ? Colors.deepOrange
+                                : Colors.teal.shade400,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    SizedBox(
+                      width: 65,
+                      child: Text(
+                        '$dayTotal kcal',
+                        textAlign: TextAlign.end,
+                        style: const TextStyle(
+                            fontSize: 12, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StatBox extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+
+  const _StatBox({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: TextStyle(
+                fontSize: 15, fontWeight: FontWeight.bold, color: color),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 11, color: Colors.grey),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MacroLegend extends StatelessWidget {
+  final String label;
+  final double grams;
+  final int percentage;
+  final Color color;
+
+  const _MacroLegend({
+    required this.label,
+    required this.grams,
+    required this.percentage,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          '$label: ${grams.toStringAsFixed(0)}g ($percentage%)',
+          style: const TextStyle(fontSize: 11, color: Colors.grey),
+        ),
+      ],
     );
   }
 }

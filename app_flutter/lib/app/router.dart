@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../features/capture/capture_screen.dart';
-import '../features/capture/review_screen.dart';
-import '../features/results/results_screen.dart';
-import '../features/home/home_screen.dart';
-import '../features/meals/saved_meals_screen.dart';
-import '../features/meals/meal_history_screen.dart';
-import '../features/auth/login_screen.dart';
-import '../features/auth/signup_screen.dart';
-import '../features/auth/auth_provider.dart';
-import '../features/settings/settings_screen.dart';
+import 'package:foodvision/features/capture/capture_screen.dart';
+import 'package:foodvision/features/capture/review_screen.dart';
+import 'package:foodvision/features/results/results_screen.dart';
+import 'package:foodvision/features/home/home_screen.dart';
+import 'package:foodvision/features/meals/saved_meals_screen.dart';
+import 'package:foodvision/features/meals/meal_history_screen.dart';
+import 'package:foodvision/features/auth/login_screen.dart';
+import 'package:foodvision/features/auth/signup_screen.dart';
+import 'package:foodvision/features/auth/auth_provider.dart';
+import 'package:foodvision/features/settings/settings_screen.dart';
+import 'package:foodvision/features/profile/profile_screen.dart';
 
 /// Named route constants — use these instead of raw strings
 class AppRoutes {
@@ -23,6 +24,7 @@ class AppRoutes {
   static const savedMeals = '/saved-meals';
   static const history = '/history';
   static const settings = '/settings';
+  static const profile = '/profile';
 }
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -71,7 +73,9 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: AppRoutes.capture,
-        builder: (context, state) => const CaptureScreen(),
+        builder: (context, state) => CaptureScreen(
+          suggestedShotPrompt: state.extra as String?,
+        ),
       ),
       GoRoute(
         path: AppRoutes.review,
@@ -92,6 +96,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.settings,
         builder: (context, state) => const SettingsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.profile,
+        builder: (context, state) => const ProfileScreen(),
       ),
     ],
   );

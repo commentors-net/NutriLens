@@ -1,9 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/api/food_vision_client.dart';
-import '../../core/config/environment.dart';
-import '../../core/models/analyze_response.dart';
-import '../../core/models/meal_draft.dart';
-import '../meals/meals_provider.dart';
+import 'package:foodvision/core/api/food_vision_client.dart';
+import 'package:foodvision/core/models/analyze_response.dart';
+import 'package:foodvision/core/models/meal_draft.dart';
+import 'package:foodvision/core/utils/device_info.dart';
+import 'package:foodvision/features/meals/meals_provider.dart';
 
 // ─── Analysis provider ────────────────────────────────────────────────────────
 
@@ -19,10 +19,10 @@ class AnalysisNotifier extends StateNotifier<AsyncValue<AnalyzeMealResponse?>> {
     try {
       final result = await _client.analyzeMeal(
         imagePaths: photoPaths,
-        platform: 'android',
-        appVersion: '0.1.0',
+        platform: DeviceInfo.getDevicePlatform(),
+        appVersion: DeviceInfo.getAppVersion(),
         photoCount: photoPaths.length,
-        locale: 'en_MY',
+        locale: DeviceInfo.getDeviceLocale(),
         timestamp: DateTime.now(),
       );
       state = AsyncValue.data(result);
@@ -48,8 +48,8 @@ class AnalysisNotifier extends StateNotifier<AsyncValue<AnalyzeMealResponse?>> {
 final analysisProvider =
     StateNotifierProvider<AnalysisNotifier, AsyncValue<AnalyzeMealResponse?>>(
   (ref) {
-    final apiBaseUrl = ref.watch(apiBaseUrlProvider);
-    return AnalysisNotifier(FoodVisionClient(baseUrl: apiBaseUrl));
+    final client = ref.watch(foodVisionClientProvider);
+    return AnalysisNotifier(client);
   },
 );
 
@@ -65,8 +65,9 @@ class SaveMealNotifier extends StateNotifier<AsyncValue<String?>> {
   Future<void> save(AnalyzeMealResponse analysis, {List<String> imagePaths = const []}) async {
     state = const AsyncValue.loading();
     try {
-      // Save to backend
-      final mealId = await _client.saveMealFromAnalysis(analysis, imagePaths: imagePaths);
+      // Save to backend with cloud image upload
+      final saveResult = await _client.saveMealFromAnalysis(analysis, imagePaths: imagePaths);
+      final mealId = saveResult.mealId;
       
       // Also save to local database
       final savedMeal = SavedMeal(
@@ -104,8 +105,8 @@ class SaveMealNotifier extends StateNotifier<AsyncValue<String?>> {
 final saveMealProvider =
     StateNotifierProvider<SaveMealNotifier, AsyncValue<String?>>(
   (ref) {
-    final apiBaseUrl = ref.watch(apiBaseUrlProvider);
-    return SaveMealNotifier(ref, FoodVisionClient(baseUrl: apiBaseUrl));
+    final client = ref.watch(foodVisionClientProvider);
+    return SaveMealNotifier(ref, client);
   },
 );
 
